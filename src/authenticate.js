@@ -1,9 +1,8 @@
-const auth = require("basic-auth");
 const PASSCODE = process.env.PASSCODE;
 
 module.exports = (req, res, next) => {
 	if (PASSCODE) {
-		const { pass } = auth(req);
+		const pass = req.body.pass || "";
 		if ( pass !== PASSCODE ) {
 			// @todo @me -> Read abt this
 			res.setHeader("WWW-Authenticate", "Basic realm=\"Bandwidth-Hero Compression Service\"");

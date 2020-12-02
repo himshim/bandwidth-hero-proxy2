@@ -1,5 +1,5 @@
-const fetch = require("node-fetch");
-const pick = require("--lodash").pick;
+const fetch = require("request-compose");
+const pick = require("../util/pick");
 const shouldCompress = require("./shouldCompress");
 const redirect = require("./redirect");
 const compress = require("./compress");

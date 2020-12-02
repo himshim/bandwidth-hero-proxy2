@@ -4,7 +4,6 @@ const params = require("./src/params");
 const proxy = require("./src/proxy");
 const morgan = require("morgan");
 const { ServerResponse } = require("http");
-require("dotenv").config();
 
 const PORT = process.env.PORT || 8080;
 
@@ -17,7 +16,7 @@ function exitHandler(sig, res) {
 	}
 
 	server.close();
-	process.exit(0);			
+	process.exit(0);
 }
 
 app.enable("trust proxy");

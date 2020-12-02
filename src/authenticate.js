@@ -1,8 +1,10 @@
+require("dotenv").config();
 const PASSCODE = process.env.PASSCODE;
 
 module.exports = (req, res, next) => {
+	console.log(PASSCODE);
 	if (PASSCODE) {
-		const pass = req.body.pass || "";
+		const pass = (req.body ? req.body.pass: "") || "";
 		if ( pass !== PASSCODE ) {
 			// @todo @me -> Read abt this
 			res.setHeader("WWW-Authenticate", "Basic realm=\"Bandwidth-Hero Compression Service\"");

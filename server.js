@@ -1,24 +1,24 @@
-const app = require('express')();
-const auth = require('basic-auth');
-const authenticate = require('./src/authenticate');
-const params = require('./src/params');
-const proxy = require('./src/proxy');
-require('dotenv').config();
+const app = require("express")();
+const authenticate = require("./src/authenticate");
+const params = require("./src/params");
+const proxy = require("./src/proxy");
+const { ServerResponse } = require("http");
+require("dotenv").config();
 
-const PORT = process.env.PORT || 8080
+const PORT = process.env.PORT || 8080;
 
 function exitHandler(sig, res) {
-    console.log(`Received signal ${sig}... Exiting gracefully :D...`);
+	console.log(`Received signal ${sig}... Exiting gracefully :D...`);
 
-    if( !res && res instanceof Response ){
-        res.sendStatus(200);
-    }
+	if( !res && res instanceof ServerResponse ){
+		res.sendStatus(200);
+	}
 
-    server.close();
-    process.exit(0);
+	server.close();
+	process.exit(0);
 }
 
-app.enable('trust proxy');
+app.enable("trust proxy");
 /**
  * @note - To the reader ->
     By enabling the "trust proxy" setting via app.enable('trust proxy'), Express will have knowledge that it's sitting behind a proxy and that the X-Forwarded-* header fields may be trusted, which otherwise may be easily spoofed.
@@ -30,11 +30,11 @@ app.enable('trust proxy');
 
 app.use( authenticate );
 
-app.get('/', params, proxy);
-app.get('/end', (req, res) => {   // can't be directly accessed, only after request has been authenticated
-    exitHandler("END_SERVER", res);
+app.get("/", params, proxy);
+app.get("/end", (req, res) => {   // can't be directly accessed, only after request has been authenticated
+	exitHandler("END_SERVER", res);
 });
 
-process.on('exit', exitHandler);
+process.on("exit", exitHandler);
 
 const server = app.listen(PORT, () => console.log(`Listening on ${PORT}`));

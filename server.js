@@ -2,20 +2,22 @@ const app = require("express")();
 const authenticate = require("./src/authenticate");
 const params = require("./src/params");
 const proxy = require("./src/proxy");
+const morgan = require("morgan");
 const { ServerResponse } = require("http");
 require("dotenv").config();
 
 const PORT = process.env.PORT || 8080;
 
 function exitHandler(sig, res) {
+	if(!server)	return;
 	console.log(`Received signal ${sig}... Exiting gracefully :D...`);
 
-	if( !res && res instanceof ServerResponse ){
+	if( res && res instanceof ServerResponse ){
 		res.sendStatus(200);
 	}
 
 	server.close();
-	process.exit(0);
+	process.exit(0);			
 }
 
 app.enable("trust proxy");
@@ -28,13 +30,16 @@ app.enable("trust proxy");
     The second change this makes is the req.ip and req.ips values will be populated with X-Forwarded-For's list of addresses.
  */
 
+app.use(morgan("dev"));
 app.use( authenticate );
+app.use((req,res,next) => {
+	console.log(req.query, req.body, req.params);
+	next();
+});
 
 app.get("/", params, proxy);
 app.get("/end", (req, res) => {   // can't be directly accessed, only after request has been authenticated
 	exitHandler("END_SERVER", res);
 });
-
-process.on("exit", exitHandler);
 
 const server = app.listen(PORT, () => console.log(`Listening on ${PORT}`));

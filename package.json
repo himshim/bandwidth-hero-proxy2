@@ -11,9 +11,9 @@
 		"dev": "nodemon server.js"
 	},
 	"dependencies": {
-		"basic-auth": "^2.0.1",
 		"dotenv": "^8.2.0",
 		"express": "^5.0.0-alpha.8",
+		"morgan": "^1.10.0",
 		"request-compose": "^2.1.0",
 		"sharp": "^0.26.3"
 	},

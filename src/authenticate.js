@@ -2,7 +2,6 @@ require("dotenv").config();
 const PASSCODE = process.env.PASSCODE;
 
 module.exports = (req, res, next) => {
-	console.log(PASSCODE);
 	if (PASSCODE) {
 		const pass = (req.body ? req.body.pass: "") || "";
 		if ( pass !== PASSCODE ) {

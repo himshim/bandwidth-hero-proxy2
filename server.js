@@ -1,11 +1,12 @@
-const app = require("express")();
+const express= require("express");
+const app = express();
 const authenticate = require("./src/authenticate");
 const params = require("./src/params");
 const proxy = require("./src/proxy");
 const morgan = require("morgan");
 const { ServerResponse } = require("http");
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 80;
 
 function exitHandler(sig, res) {
 	if(!server)	return;
@@ -30,15 +31,19 @@ app.enable("trust proxy");
  */
 
 app.use(morgan("dev"));
-app.use( authenticate );
-app.use((req,res,next) => {
+
+app.use((req,res) => {	/**@debug */
 	console.log(req.query, req.body, req.params);
-	next();
+	res.send(204);
 });
 
 app.get("/", params, proxy);
-app.get("/end", (req, res) => {   // can't be directly accessed, only after request has been authenticated
-	exitHandler("END_SERVER", res);
+app.get("/end", express.urlencoded({extended: false}), express.json(), (req, res) => {   // can't be directly accessed, only after request has been authenticated
+	if( process.env.PASSCODE && process.env.PASSCODE === req.body.PASS ){
+		exitHandler("END_SERVER", res);
+	}
+
+	res.sendStatus(401);
 });
 
 const server = app.listen(PORT, () => console.log(`Listening on ${PORT}`));

@@ -2,7 +2,7 @@
 
 This is a fork NOT primarily for adding new features. It just keeps it updated, and for minor changes.
 
-[![CodeFactor](https://www.codefactor.io/repository/github/adityagupta150/bandwidth-hero-proxy/badge)](https://www.codefactor.io/repository/github/adityagupta150/bandwidth-hero-proxy)
+[![CodeFactor](https://www.codefactor.io/repository/github/adi-g15/bandwidth-hero-proxy/badge)](https://www.codefactor.io/repository/github/adi-g15/bandwidth-hero-proxy)
 
 The original and this fork, both are, data compression service used by
 [Bandwidth Hero](https://github.com/ayastreb/bandwidth-hero) browser extension. It compresses given
@@ -19,7 +19,7 @@ and user's IP address through to the origin host.
 
 You can deploy this service to Heroku:
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/AdityaGupta150/bandwidth-hero-proxy)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/adi-g15/bandwidth-hero-proxy)
 
 <!-- READ THIS ARTICLE LATER AdityaG
 ### Self-hosted

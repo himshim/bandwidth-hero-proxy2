@@ -1,3 +1,4 @@
-.idea
+.vscode
 node_modules
-ecosystem.js
+.env
+yarn-error.log

@@ -1,26 +1,32 @@
 const sharp = require("sharp");
-const redirect = require("./redirect");
 
-function compress(req, res, input) {
-	const format = req.params.webp ? "webp" : "jpeg";
+function compress(input, webp, grayscale, quality, originSize) {
+	const format = webp ? "webp" : "jpeg";
 
-	sharp(input)
-		.grayscale(req.params.grayscale)
+	return sharp(input)
+		.grayscale(grayscale)
 		.toFormat(format, {
-			quality: req.params.quality,
+			quality: quality,
 			progressive: true,
 			optimizeScans: true
 		})
-		.toBuffer((err, output, info) => {
-			if (err || !info || res.headersSent) return redirect(req, res);
-
-			res.setHeader("content-type", `image/${format}`);
-			res.setHeader("content-length", info.size);
-			res.setHeader("x-original-size", req.params.originSize);
-			res.setHeader("x-bytes-saved", req.params.originSize - info.size);
-			res.status(200);
-			res.write(output);
-			res.end();
+		// .toBuffer({resolveWithObject: true}).then(({data,info}))	// this way we can also get the info about output image, like height, width
+		.toBuffer()
+		.then( output => {
+			return {
+				err: null,
+				headers: {
+					"content-type": `image/${format}`,
+					"content-length": info.size,
+					"x-original-size": originSize,
+					"x-bytes-saved": originSize - info.size,
+				},
+				output: output
+			};
+		}).catch(err => {
+			return {
+				err: err
+			};
 		});
 }
 

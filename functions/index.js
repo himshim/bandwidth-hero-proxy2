@@ -2,7 +2,6 @@ const pick = require("../util/pick");
 const fetch = require("node-fetch");
 const shouldCompress = require("../util/shouldCompress");
 const compress = require("../util/compress");
-const fs = require("fs");
 
 const DEFAULT_QUALITY = 40;
 
@@ -41,12 +40,6 @@ exports.handler = async (event, context) => {
                 'x-forwarded-for': event.headers['x-forwarded-for'] || event.ip,
                 via: '1.1 bandwidth-hero'
             }
-            // timeout: 10000,
-            // maxRedirects: 5,
-            // encoding: null,
-            // strictSSL: false,
-            // gzip: true,
-            // jar: true
         }).then(async res => {
             if (!res.ok) {
                 return {
@@ -71,14 +64,13 @@ exports.handler = async (event, context) => {
                 throw err;
             }
 
-            console.log(`From ${originSize}, to ${output.length}`);
-            // console.log(`Comp: ${output.length}, Base64: ${output.toString('base64').length}, header.size: ${headers["content-length"]}`);
+            console.log(`From ${originSize}, Saved: ${(originSize - output.length)/originSize}%`);
             const encoded_output = output.toString('base64');
             return {
                 statusCode: 200,
                 body: encoded_output,
                 isBase64Encoded: true,  // note: The final size we receive is `originSize` only, maybe it is decoding it server side, because at client side i do get the decoded image directly
-                // "content-length": encoded_output.length,     // even this doesn't have any effect, this header contains the actual data size, (decrypted binary data size, not the base64 version)
+                // "content-length": encoded_output.length,     // this doesn't have any effect, this header contains the actual data size, (decrypted binary data size, not the base64 version)
                 headers: {
                     "content-encoding": "identity",
                     ...response_headers,
@@ -87,11 +79,6 @@ exports.handler = async (event, context) => {
             }
         } else {
             console.log("Bypassing... Size: " , data.length);
-            console.log({
-                "content-encoding": "identity",
-                // "x-proxy-bypass": '1',
-                ...response_headers,
-            });
             return {    // bypass
                 statusCode: 200,
                 body: data.toString('base64'),

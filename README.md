@@ -3,12 +3,12 @@
 **Serverless** port of Bandwidth Hero Data Compression Service 🚀.
 
 Deploy your own functions in less than a minute, read the #Deployment section.
-एक मिनट से भी कम समय में इसे deploy करें , उस के लिए #Deployment अनुभाग पढ़ें।
+
+**एक मिनट से भी कम समय में इसे deploy करें , उस के लिए #Deployment अनुभाग पढ़ें।**
 
 Currently using Netlify functions, which has a genorous limit of calls you can make, mostly enough for personal use, or small scale use, for faster and much more users, a dedicated server (code on original repo) maybe preferable :D
 
-The original and this fork, both are, data compression service used by
-[Bandwidth Hero](https://github.com/ayastreb/bandwidth-hero) browser extension. It compresses (optionally grayscale) given image to low-res [WebP](https://developers.google.com/speed/webp/) or JPEG image.
+The original and this fork, both are, data compression service used by [Bandwidth Hero](https://github.com/ayastreb/bandwidth-hero) browser extension. It compresses (optionally grayscale) given image to low-res [WebP](https://developers.google.com/speed/webp/) or JPEG image.
 
 It downloads original image and transforms it with [Sharp](https://github.com/lovell/sharp) on the fly without saving images on disk.
 

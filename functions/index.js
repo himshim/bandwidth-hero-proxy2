@@ -2,6 +2,7 @@ const pick = require("../util/pick");
 const fetch = require("node-fetch");
 const shouldCompress = require("../util/shouldCompress");
 const compress = require("../util/compress");
+const fs = require("fs");
 
 const DEFAULT_QUALITY = 40;
 
@@ -33,6 +34,7 @@ exports.handler = async (event, context) => {
 
     console.log("Fetching...", url);
     try {
+        let response_headers = {};
         const { data, type: originType } = await fetch(url, {
             headers: {
                 ...pick(event.headers, ['cookie', 'dnt', 'referer']),
@@ -53,11 +55,16 @@ exports.handler = async (event, context) => {
                 }
             }
 
+            response_headers = res.headers;
             return {
-                data: await res.text(),
+                data: await res.buffer(),
                 type: res.headers.get("content-type") || ""
             }
         })
+
+        // console.log( data.length, escape(data).toString().length );
+        // fs.writeFileSync("temp.png", data);
+        // fs.writeFileSync("temp_string.png", '' + data);
 
         const originSize = data.length;
         console.log({ originType, originSize });
@@ -71,23 +78,31 @@ exports.handler = async (event, context) => {
             }
 
             console.log(`Compressed from ${originSize}, to ${output.length}`);
+            // fs.writeFileSync("compressed.webp", output)
+            // fs.writeFileSync("compressed_str.webp", output.toString())
             return {
                 statusCode: 200,
-                body: output,
+                body: output.toString(),
                 headers: {
                     "content-encoding": "identity",
-                    ...event.headers,
+                    ...response_headers,
                     ...headers
                 }
             }
         } else {
-            console.log("Bypassing request...");
+            console.log("Bypassing request... Size: " , data.length);
+            console.log({
+                "content-encoding": "identity",
+                // "x-proxy-bypass": '1',
+                ...response_headers,
+            });
             return {    // bypass
                 statusCode: 200,
-                body: data,
+                body: data.toString(),
                 headers: {
-                    "x-proxy-bypass": '1',
-                    "content-length": data.length
+                    "content-encoding": "identity",
+                    // "x-proxy-bypass": '1',
+                    ...response_headers,
                 }
             }
         }

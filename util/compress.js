@@ -10,9 +10,10 @@ function compress(input, webp, grayscale, quality, originSize) {
 			progressive: true,
 			optimizeScans: true
 		})
-		// .toBuffer({resolveWithObject: true}).then(({data,info}))	// this way we can also get the info about output image, like height, width
-		.toBuffer()
-		.then( output => {
+		.toBuffer({resolveWithObject: true})
+		.then(({data: output,info}) => {	// this way we can also get the info about output image, like height, width
+		// .toBuffer()
+		// .then( output => {
 			return {
 				err: null,
 				headers: {

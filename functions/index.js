@@ -32,7 +32,6 @@ exports.handler = async (event, context) => {
     const grayscale = bw != 0;
     const quality = parseInt(l, 10) || DEFAULT_QUALITY;
 
-    console.log("Fetching...", url);
     try {
         let response_headers = {};
         const { data, type: originType } = await fetch(url, {
@@ -62,12 +61,7 @@ exports.handler = async (event, context) => {
             }
         })
 
-        // console.log( data.length, escape(data).toString().length );
-        // fs.writeFileSync("temp.png", data);
-        // fs.writeFileSync("temp_string.png", '' + data);
-
         const originSize = data.length;
-        console.log({ originType, originSize });
 
         if (shouldCompress(originType, originSize, webp)) {
             const { err, output, headers } = await compress(data, webp, grayscale, quality, originSize);   // compress
@@ -77,12 +71,14 @@ exports.handler = async (event, context) => {
                 throw err;
             }
 
-            console.log(`Compressed from ${originSize}, to ${output.length}`);
-            // fs.writeFileSync("compressed.webp", output)
-            // fs.writeFileSync("compressed_str.webp", output.toString())
+            console.log(`From ${originSize}, to ${output.length}`);
+            // console.log(`Comp: ${output.length}, Base64: ${output.toString('base64').length}, header.size: ${headers["content-length"]}`);
+            const encoded_output = output.toString('base64');
             return {
                 statusCode: 200,
-                body: output.toString(),
+                body: encoded_output,
+                isBase64Encoded: true,  // note: The final size we receive is `originSize` only, maybe it is decoding it server side, because at client side i do get the decoded image directly
+                // "content-length": encoded_output.length,     // even this doesn't have any effect, this header contains the actual data size, (decrypted binary data size, not the base64 version)
                 headers: {
                     "content-encoding": "identity",
                     ...response_headers,
@@ -90,7 +86,7 @@ exports.handler = async (event, context) => {
                 }
             }
         } else {
-            console.log("Bypassing request... Size: " , data.length);
+            console.log("Bypassing... Size: " , data.length);
             console.log({
                 "content-encoding": "identity",
                 // "x-proxy-bypass": '1',
@@ -98,7 +94,8 @@ exports.handler = async (event, context) => {
             });
             return {    // bypass
                 statusCode: 200,
-                body: data.toString(),
+                body: data.toString('base64'),
+                isBase64Encoded: true,
                 headers: {
                     "content-encoding": "identity",
                     // "x-proxy-bypass": '1',

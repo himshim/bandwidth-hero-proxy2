@@ -7,7 +7,7 @@
     "start": "ntl dev"
   },
   "dependencies": {
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^3.3.0",
     "sharp": "^0.31.3"
   }
 }

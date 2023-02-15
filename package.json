@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "node-fetch": "^2.6.1",
-    "sharp": "^0.28.1"
+    "sharp": "^0.31.3"
   }
 }

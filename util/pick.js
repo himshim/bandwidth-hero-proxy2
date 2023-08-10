@@ -1,3 +1,12 @@
 // Since only single function required from lodash or underscore, writing it self
 
-module.exports=(r,e)=>{let l={};for(let t in r||(r={}),Array.isArray(e)||(e=[e]),r)Object.hasOwnProperty.call(r,t)&&e.includes(t)&&(l[t]=r[t]);return l};
+// Picks specific properties from an object
+module.exports = (object, properties) => {
+  let picked = {};
+  for (let key in object || (object = {})) {
+    if (Object.hasOwnProperty.call(object, key) && properties.includes(key)) {
+      picked[key] = object[key];
+    }
+  }
+  return picked;
+};

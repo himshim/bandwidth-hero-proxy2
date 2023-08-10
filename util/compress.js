@@ -1,1 +1,24 @@
-const sharp=require("sharp");function compress(e,t,r,s,a){let o=t?"webp":"jpeg";return sharp(e).grayscale(r).toFormat(o,{quality:s,progressive:!0,optimizeScans:!0}).toBuffer({resolveWithObject:!0}).then(({data:e,info:t})=>({err:null,headers:{"content-type":`image/${o}`,"content-length":t.size,"x-original-size":a,"x-bytes-saved":a-t.size},output:e})).catch(e=>({err:e}))}module.exports=compress;
+// Compresses an image using Sharp library
+const sharp = require("sharp");
+
+function compress(imagePath, useWebp, grayscale, quality, originalSize) {
+  let format = useWebp ? "webp" : "jpeg";
+
+  return sharp(imagePath)
+    .grayscale(grayscale)
+    .toFormat(format, { quality, progressive: true, optimizeScans: true })
+    .toBuffer({ resolveWithObject: true })
+    .then(({ data, info }) => ({
+      err: null,
+      headers: {
+        "content-type": `image/${format}`,
+        "content-length": info.size,
+        "x-original-size": originalSize,
+        "x-bytes-saved": originalSize - info.size,
+      },
+      output: data,
+    }))
+    .catch((err) => ({ err }));
+}
+
+module.exports = compress;

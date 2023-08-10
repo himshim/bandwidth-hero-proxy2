@@ -22,7 +22,7 @@ I can't provide you with my deployment, since I have the free tier, and that has
 
 You need to deploy the functions to Netlify:
 
-[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/himshim/bandwidth-hero-proxy2)
+[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/correct-repo/bandwidth-hero-proxy2)
 
 Then, in the **Data Compression Service** in Bandwidth Hero extension, add `https://your-netlify-domain.netlify.app/api/index`, and you are good to go.
 

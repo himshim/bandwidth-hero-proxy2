@@ -1,8 +1,8 @@
 # Bandwidth Hero Data Compression Service
 
-**Serverless** port of Bandwidth Hero Data Compression Service 🚀.
+Welcome to the **Serverless** port of Bandwidth Hero Data Compression Service 🚀. This service is designed to compress images on the fly, saving you bandwidth and improving your browsing experience.
 
-Deploy your own functions in less than a minute, read the #Deployment section.
+To get started with deploying your own instance of this service, please follow the detailed instructions in the #Deployment section below.
 
 **एक मिनट से भी कम समय में इसे deploy करें , उस के लिए #Deployment अनुभाग पढ़ें।**
 
@@ -22,7 +22,7 @@ I can't provide you with my deployment, since I have the free tier, and that has
 
 You need to deploy the functions to Netlify:
 
-[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/adi-g15/bandwidth-hero-proxy)
+[![Deploy](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/correct-repo/bandwidth-hero-proxy2)
 
 Then, in the **Data Compression Service** in Bandwidth Hero extension, add `https://your-netlify-domain.netlify.app/api/index`, and you are good to go.
 

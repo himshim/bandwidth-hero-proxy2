@@ -14,6 +14,10 @@ It downloads original image and transforms it with [Sharp](https://github.com/lo
 
 > Note: It downloads images on user's behalf (By passing in same headers to the domain with required image), passing cookies and user's IP address through to the origin host.
 
+## Self-Hosting Instructions
+
+If you prefer to self-host this application instead of deploying it on Netlify, please see the [self-hosting guide](SELF_HOSTING.md) for detailed instructions on how to set up and run the application on your own server.
+
 ## Deployment
 
 You need to deploy the functions to Netlify:

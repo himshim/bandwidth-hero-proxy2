@@ -1,4 +1,5 @@
-.vscode
-node_modules
+node_modules/
+dist/
+.netlify/
 .env
-yarn-error.log
+Dockerfile.lock

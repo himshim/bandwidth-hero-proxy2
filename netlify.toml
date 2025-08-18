@@ -1,7 +1,12 @@
-[functions]
-    directory = "functions/"
+[build]
+  command = "npm run build"
+  functions = "functions"
+  publish = "."
 
-[[redirects]]
-    from = "/api/*"
-    to = "/.netlify/functions/:splat"
-    status = 200
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["sharp"]
+
+[dev]
+  command = "npm start"
+  port = 8888

@@ -1,8 +1,7 @@
 [build]
-  command = "npm run build"
+  environment = { NODE_VERSION = "18" }
   functions = "functions"
   publish = "."
-  environment = { NODE_VERSION = "18" }
 
 [functions]
   node_bundler = "esbuild"
@@ -11,3 +10,8 @@
 [dev]
   command = "npm start"
   port = 8888
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200

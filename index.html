@@ -1,22 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bandwidth Hero Proxy</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bandwidth Hero Proxy</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <h1>Bandwidth Hero Proxy</h1>
-        <p>Welcome to the Bandwidth Hero Proxy!</p>
-        <p>To use the proxy in the Bandwidth Hero extension, follow these steps:</p>
-        <ol>
-            <li>Open the Bandwidth Hero extension settings.</li>
-            <li>In the Data Compression Service section, add the following URL: <code>https://your-netlify-domain.netlify.app/api/index</code>.</li>
-            <li>Save the settings and you are good to go!</li>
-        </ol>
-        <p>For more information and the source code, visit the <a href="https://github.com/himshim/bandwidth-hero-proxy2">GitHub repository</a>.</p>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-xl mx-auto text-center py-12">
+    <h1 class="text-3xl font-bold">Bandwidth Hero Proxy</h1>
+    <p class="mt-4">Compress images on-the-fly using Netlify Functions.</p>
+
+    <div class="bg-white shadow-md p-6 rounded-lg mt-6 text-left">
+      <h2 class="font-semibold">Setup Instructions</h2>
+      <ol class="list-decimal list-inside mt-2 text-gray-700">
+        <li>Install the <a href="https://bandwidth-hero.com" class="text-blue-600">Bandwidth Hero extension</a>.</li>
+        <li>In the extension, set Data Compression Service to:<br>
+          <code class="bg-gray-100 px-2 py-1 rounded">https://YOUR-NETLIFY-APP.netlify.app/api/index</code>
+        </li>
+        <li>Enjoy faster, compressed browsing 🎉</li>
+      </ol>
     </div>
+  </div>
 </body>
 </html>

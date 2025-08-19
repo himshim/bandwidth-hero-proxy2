@@ -1,63 +1,144 @@
-const pick = require("../util/pick"),
-  fetch = require("node-fetch"),
-  shouldCompress = require("../util/shouldCompress"),
-  compress = require("../util/compress"),
-  DEFAULT_QUALITY = 40;
-exports.handler = async (e, t) => {
-  let { url: r } = e.queryStringParameters,
-    { jpeg: s, bw: o, l: a } = e.queryStringParameters;
-  if (!r)
-    return { statusCode: 200, body: "Bandwidth Hero Data Compression Service" };
+const pick = require("../util/pick");
+const shouldCompress = require("../util/shouldCompress");
+const compress = require("../util/compress");
+
+const DEFAULT_QUALITY = process.env.DEFAULT_QUALITY || 40;
+
+// A realistic browser UA to avoid hotlink/CDN blocks
+const REAL_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+function respond(statusCode, body, {
+  contentType = "text/plain; charset=utf-8",
+  extraHeaders = {},
+  isBase64Encoded = false
+} = {}) {
+  return {
+    statusCode,
+    body,
+    isBase64Encoded,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET,HEAD,OPTIONS",
+      "content-type": contentType,
+      "content-encoding": "identity",
+      "cache-control": "no-cache",
+      ...extraHeaders,
+    }
+  };
+}
+
+exports.handler = async (event) => {
   try {
-    r = JSON.parse(r);
-  } catch {}
-  Array.isArray(r) && (r = r.join("&url=")),
-    (r = r.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://"));
-  let d = !s,
-    n = 0 != o,
-    i = parseInt(a, 10) || 40;
-  try {
-    let h = {},
-      { data: c, type: l } = await fetch(r, {
-        headers: {
-          ...pick(e.headers, ["cookie", "dnt", "referer"]),
-          "user-agent": "Bandwidth-Hero Compressor",
-          "x-forwarded-for": e.headers["x-forwarded-for"] || e.ip,
-          via: "1.1 bandwidth-hero",
-        },
-      }).then(async (e) =>
-        e.ok
-          ? ((h = e.headers),
-            {
-              data: await e.buffer(),
-              type: e.headers.get("content-type") || "",
-            })
-          : { statusCode: e.status || 302 },
-      ),
-      p = c.length;
-    if (!shouldCompress(l, p, d))
-      return (
-        console.log("Bypassing... Size: ", c.length),
+    const method = (event.httpMethod || "GET").toUpperCase();
+
+    if (method === "OPTIONS") return respond(204, "");
+    if (method === "HEAD") return respond(200, "");
+
+    const { url, jpeg, bw, l } = event.queryStringParameters || {};
+
+    // Handshake string expected by the extension
+    if (!url) {
+      return respond(200, "bandwidth-hero-proxy", { contentType: "text/plain" });
+    }
+
+    // Normalize URL
+    let targetUrl = url;
+    try { targetUrl = JSON.parse(url); } catch {}
+    if (Array.isArray(targetUrl)) targetUrl = targetUrl.join("&url=");
+    targetUrl = targetUrl.replace(
+      /http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i,
+      "http://"
+    );
+
+    const useWebp   = !jpeg;            // default WebP unless jpeg=1
+    const grayscale = bw == "1";
+    const quality   = parseInt(l, 10) || DEFAULT_QUALITY;
+
+    // Derive fallback referer
+    let refererFallback = "";
+    try { refererFallback = new URL(targetUrl).origin + "/"; } catch {}
+
+    // Fetch original image
+    const response = await fetch(targetUrl, {
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        ...pick(event.headers || {}, ["cookie", "dnt", "referer"]),
+        referer: (event.headers && event.headers.referer) || refererFallback || undefined,
+        "user-agent": REAL_UA,
+        "x-forwarded-for": (event.headers && event.headers["x-forwarded-for"]) || event.ip,
+        via: "1.1 bandwidth-hero",
+      },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      return respond(response.status, "Failed to fetch image", {
+        extraHeaders: { "x-bh-debug": `fetch_not_ok:${response.status}` }
+      });
+    }
+
+    const arrayBuf    = await response.arrayBuffer();
+    const sourceBuf   = Buffer.from(arrayBuf);
+    const contentType = response.headers.get("content-type") || "";
+    const originalLen = sourceBuf.length;
+
+    // Decide to compress or bypass
+    const should = shouldCompress(contentType, originalLen);
+
+    if (!should) {
+      // IMPORTANT: include content-length on bypass too
+      return respond(
+        200,
+        sourceBuf.toString("base64"),
         {
-          statusCode: 200,
-          body: c.toString("base64"),
-          isBase64Encoded: !0,
-          headers: { "content-encoding": "identity", ...h },
+          contentType: contentType || "application/octet-stream",
+          isBase64Encoded: true,
+          extraHeaders: {
+            "content-length": String(originalLen),
+            "x-bh-debug": `bypass:${contentType}|len=${originalLen}|useWebp=${useWebp}`,
+            "x-original-size": String(originalLen),
+            "x-bytes-saved": "0"
+          }
         }
       );
-    {
-      let { err: u, output: y, headers: g } = await compress(c, d, n, i, p);
-      if (u) throw (console.log("Conversion failed: ", r), u);
-      console.log(`From ${p}, Saved: ${(p - y.length) / p}%`);
-      let $ = y.toString("base64");
-      return {
-        statusCode: 200,
-        body: $,
-        isBase64Encoded: !0,
-        headers: { "content-encoding": "identity", ...h, ...g },
-      };
     }
-  } catch (f) {
-    return console.error(f), { statusCode: 500, body: f.message || "" };
+
+    // Compress with Sharp
+    const { err, output, headers } = await compress(
+      sourceBuf,
+      useWebp,
+      grayscale,
+      quality,
+      originalLen
+    );
+
+    if (err) {
+      return respond(500, "Compression failed", {
+        extraHeaders: { "x-bh-debug": "sharp_error" }
+      });
+    }
+
+    return {
+      statusCode: 200,
+      body: output.toString("base64"),
+      isBase64Encoded: true,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "*",
+        "access-control-allow-methods": "GET,HEAD,OPTIONS",
+        "content-encoding": "identity",
+        "cache-control": "no-store",
+        "x-bh-debug": `compressed|q=${quality}|grayscale=${grayscale}|useWebp=${useWebp}`,
+        ...headers, // includes `content-type`, `content-length`, `x-original-size`, `x-bytes-saved`
+      }
+    };
+  } catch (e) {
+    return respond(500, `Error: ${e.message || "Internal Error"}`, {
+      extraHeaders: { "x-bh-debug": "exception" }
+    });
   }
 };

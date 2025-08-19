@@ -1,5 +1,5 @@
 {
-  "name": "aproxy15",
+  "name": "bandwidth-hero-proxy2",
   "version": "1.0.1",
   "description": "Data compression service that converts images to low-res WebP or JPEG on the fly. Used in Bandwidth-Hero browser extension.",
   "license": "MIT",
@@ -8,7 +8,6 @@
     "test": "jest tests/index.test.js"
   },
   "dependencies": {
-    "node-fetch": "^2.7.0",
     "sharp": "^0.32.4",
     "jest": "^27.4.5"
   }

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bandwidth Hero Proxy Debug</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-2xl font-bold">Bandwidth Hero Proxy — Debug Tool</h1>
+    <p class="mt-2 text-sm text-gray-600">
+      This tool fetches your Netlify compression function, shows response headers, and previews the compressed image.
+    </p>
+
+    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+      <label class="block">
+        <span class="text-sm font-medium">Image URL (direct JPG/PNG)</span>
+        <input id="imgUrl" class="mt-1 w-full border rounded p-2" placeholder="https://.../image.jpg"
+          value="https://picsum.photos/seed/netlify/1600/900.jpg"/>
+      </label>
+
+      <div class="grid grid-cols-3 gap-2">
+        <label class="block">
+          <span class="text-sm font-medium">Quality (l)</span>
+          <input id="q" type="number" min="1" max="100" class="mt-1 w-full border rounded p-2" value="25"/>
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium">Grayscale (bw)</span>
+          <select id="bw" class="mt-1 w-full border rounded p-2">
+            <option value="0" selected>No</option>
+            <option value="1">Yes</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium">Format</span>
+          <select id="fmt" class="mt-1 w-full border rounded p-2">
+            <option value="webp" selected>WebP (default)</option>
+            <option value="jpeg">JPEG (jpeg=1)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <button id="run" class="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Run Test</button>
+
+    <div id="status" class="mt-4 text-sm font-mono text-gray-700"></div>
+
+    <div class="mt-6 grid gap-6 sm:grid-cols-2">
+      <div>
+        <h2 class="font-semibold">Response Headers</h2>
+        <pre id="headers" class="mt-2 text-xs bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap"></pre>
+      </div>
+      <div>
+        <h2 class="font-semibold">Preview</h2>
+        <div class="mt-2">
+          <img id="preview" alt="compressed preview" class="border rounded max-w-full"/>
+          <div class="mt-2 text-xs text-gray-600">
+            <span id="meta"></span>
+            <a id="download" href="#" download="compressed-image" class="ml-2 text-blue-600 underline hidden">Download</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <h2 class="font-semibold">Debug Console</h2>
+      <pre id="console" class="mt-2 text-xs bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap"></pre>
+    </div>
+  </div>
+
+  <script>
+    const log = (msg) => {
+      const el = document.getElementById('console');
+      el.textContent += (typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2)) + '\n';
+    };
+
+    const base = `${window.location.origin}/api/index`;
+
+    document.getElementById('run').addEventListener('click', async () => {
+      const imgUrl = document.getElementById('imgUrl').value.trim();
+      const q = document.getElementById('q').value.trim() || '40';
+      const bw = document.getElementById('bw').value;
+      const fmt = document.getElementById('fmt').value;
+      const jpeg = fmt === 'jpeg' ? '1' : '';
+
+      const url = `${base}?url=${encodeURIComponent(imgUrl)}&l=${q}&bw=${bw}${jpeg ? `&jpeg=${jpeg}` : ''}`;
+
+      const status = document.getElementById('status');
+      const headersEl = document.getElementById('headers');
+      const preview = document.getElementById('preview');
+      const meta = document.getElementById('meta');
+      const dl = document.getElementById('download');
+
+      status.textContent = 'Fetching...';
+      headersEl.textContent = '';
+      preview.removeAttribute('src');
+      meta.textContent = '';
+      dl.classList.add('hidden');
+      dl.removeAttribute('href');
+
+      try {
+        log('Request URL: ' + url);
+
+        // First do a HEAD to read headers (optional but nice)
+        let headHeaders = {};
+        try {
+          const headRes = await fetch(url, { method: 'HEAD' });
+          headRes.headers.forEach((v, k) => headHeaders[k.toLowerCase()] = v);
+        } catch (e) {
+          log('HEAD failed (not critical): ' + e.message);
+        }
+
+        // Now GET the actual image as binary
+        const res = await fetch(url);
+        const headers = {};
+        res.headers.forEach((v, k) => headers[k.toLowerCase()] = v);
+
+        // Merge any HEAD headers we got first
+        headersEl.textContent = JSON.stringify({ ...headHeaders, ...headers }, null, 2);
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          status.textContent = `Error ${res.status}: ${errText.slice(0, 200)}`;
+          log('Non-OK status: ' + res.status);
+          return;
+        }
+
+        const ctype = headers["content-type"] || "image/webp";
+        if (!ctype.includes('image/')) {
+          status.textContent = `Unexpected content-type: ${ctype}`;
+          log('Unexpected content-type: ' + ctype);
+          return;
+        }
+
+        // IMPORTANT: Netlify already decoded base64 → we receive raw bytes here
+        const buf = await res.arrayBuffer();
+        const blob = new Blob([buf], { type: ctype });
+        const objUrl = URL.createObjectURL(blob);
+
+        preview.src = objUrl;
+        meta.textContent = `${ctype} • ${buf.byteLength} bytes | ${headers["x-bh-debug"] || "OK"}`;
+        dl.href = objUrl;
+        dl.classList.remove('hidden');
+
+        status.textContent = headers["x-bh-debug"] || "OK";
+      } catch (e) {
+        status.textContent = `Fetch error: ${e.message}`;
+        log('Exception: ' + e.message);
+      }
+    });
+  </script>
+</body>
+</html>

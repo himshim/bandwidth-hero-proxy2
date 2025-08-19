@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bandwidth Hero Proxy Debug</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-2xl font-bold">Bandwidth Hero Proxy — Debug Tool</h1>
+    <p class="mt-2 text-sm text-gray-600">
+      This tool fetches your Netlify compression function, shows response headers, and previews the compressed image.
+    </p>
+
+    <div class="mt-6 grid gap-4 sm:grid-cols-2">
+      <label class="block">
+        <span class="text-sm font-medium">Image URL (direct JPG/PNG)</span>
+        <input id="imgUrl" class="mt-1 w-full border rounded p-2" placeholder="https://.../image.jpg"
+          value="https://picsum.photos/seed/netlify/1600/900.jpg"/>
+      </label>
+
+      <div class="grid grid-cols-3 gap-2">
+        <label class="block">
+          <span class="text-sm font-medium">Quality (l)</span>
+          <input id="q" type="number" min="1" max="100" class="mt-1 w-full border rounded p-2" value="25"/>
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium">Grayscale (bw)</span>
+          <select id="bw" class="mt-1 w-full border rounded p-2">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-sm font-medium">Format</span>
+          <select id="fmt" class="mt-1 w-full border rounded p-2">
+            <option value="webp" selected>WebP (default)</option>
+            <option value="jpeg">JPEG (jpeg=1)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <button id="run" class="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Run Test</button>
+
+    <div id="status" class="mt-4 text-sm font-mono text-gray-700"></div>
+
+    <div class="mt-6 grid gap-6 sm:grid-cols-2">
+      <div>
+        <h2 class="font-semibold">Response Headers</h2>
+        <pre id="headers" class="mt-2 text-xs bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap"></pre>
+      </div>
+      <div>
+        <h2 class="font-semibold">Preview</h2>
+        <img id="preview" alt="compressed preview" class="mt-2 border rounded max-w-full"/>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const base = `${window.location.origin}/api/index`;
+
+    document.getElementById('run').addEventListener('click', async () => {
+      const imgUrl = document.getElementById('imgUrl').value.trim();
+      const q = document.getElementById('q').value.trim() || '40';
+      const bw = document.getElementById('bw').value;
+      const fmt = document.getElementById('fmt').value;
+      const jpeg = fmt === 'jpeg' ? '1' : '';
+
+      const url = `${base}?url=${encodeURIComponent(imgUrl)}&l=${q}&bw=${bw}${jpeg ? `&jpeg=${jpeg}` : ''}`;
+
+      const status = document.getElementById('status');
+      const headersEl = document.getElementById('headers');
+      const preview = document.getElementById('preview');
+
+      status.textContent = 'Fetching...';
+      headersEl.textContent = '';
+      preview.removeAttribute('src');
+
+      try {
+        const res = await fetch(url);
+        const headers = {};
+        res.headers.forEach((v, k) => headers[k] = v);
+        headersEl.textContent = JSON.stringify(headers, null, 2);
+
+        const text = await res.text(); // base64 body
+        const ctype = headers["content-type"] || "image/webp";
+        if (res.ok && text && ctype.includes("image/")) {
+          preview.src = `data:${ctype};base64,${text}`;
+          status.textContent = headers["x-bh-debug"] || "OK";
+        } else {
+          status.textContent = `Error ${res.status}: ${text.slice(0, 200)}`;
+        }
+      } catch (e) {
+        status.textContent = `Fetch error: ${e.message}`;
+      }
+    });
+  </script>
+</body>
+</html>

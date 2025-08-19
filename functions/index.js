@@ -4,6 +4,11 @@ const compress = require("../util/compress");
 
 const DEFAULT_QUALITY = process.env.DEFAULT_QUALITY || 40;
 
+// A realistic browser UA to avoid hotlink/CDN blocks
+const REAL_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
 function respond(statusCode, body, {
   contentType = "text/plain; charset=utf-8",
   extraHeaders = {},
@@ -29,33 +34,41 @@ exports.handler = async (event) => {
   try {
     const method = (event.httpMethod || "GET").toUpperCase();
 
-    // Preflight & HEAD (some extensions probe with HEAD)
     if (method === "OPTIONS") return respond(204, "");
     if (method === "HEAD") return respond(200, "");
 
     const { url, jpeg, bw, l } = event.queryStringParameters || {};
 
-    // Handshake (must be exact)
+    // Handshake string expected by the extension
     if (!url) {
       return respond(200, "bandwidth-hero-proxy", { contentType: "text/plain" });
     }
 
-    // Normalize url
+    // Normalize URL
     let targetUrl = url;
     try { targetUrl = JSON.parse(url); } catch {}
     if (Array.isArray(targetUrl)) targetUrl = targetUrl.join("&url=");
-    targetUrl = targetUrl.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
+    targetUrl = targetUrl.replace(
+      /http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i,
+      "http://"
+    );
 
-    const useWebp   = !jpeg;            // default: webp
+    const useWebp   = !jpeg;            // default WebP unless jpeg=1
     const grayscale = bw == "1";
     const quality   = parseInt(l, 10) || DEFAULT_QUALITY;
 
-    // Fetch original image with explicit Accept
+    // Derive fallback referer
+    let refererFallback = "";
+    try { refererFallback = new URL(targetUrl).origin + "/"; } catch {}
+
+    // Fetch original image
     const response = await fetch(targetUrl, {
       headers: {
-        Accept: "image/*,*/*;q=0.8",
+        Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
         ...pick(event.headers || {}, ["cookie", "dnt", "referer"]),
-        "user-agent": "Bandwidth-Hero Compressor",
+        referer: (event.headers && event.headers.referer) || refererFallback || undefined,
+        "user-agent": REAL_UA,
         "x-forwarded-for": (event.headers && event.headers["x-forwarded-for"]) || event.ip,
         via: "1.1 bandwidth-hero",
       },
@@ -73,11 +86,10 @@ exports.handler = async (event) => {
     const contentType = response.headers.get("content-type") || "";
     const originalLen = sourceBuf.length;
 
-    // Decide to compress or pass-through
-    const should = shouldCompress(contentType, originalLen, useWebp);
+    // Decide to compress or bypass
+    const should = shouldCompress(contentType, originalLen);
 
     if (!should) {
-      // Pass-through unchanged (base64) with debug so you can see why it bypassed
       return respond(
         200,
         sourceBuf.toString("base64"),
@@ -103,11 +115,10 @@ exports.handler = async (event) => {
 
     if (err) {
       return respond(500, "Compression failed", {
-        extraHeaders: { "x-bh-debug": `sharp_error` }
+        extraHeaders: { "x-bh-debug": "sharp_error" }
       });
     }
 
-    // Success: return compressed image (base64) + sharp-provided headers
     return {
       statusCode: 200,
       body: output.toString("base64"),
@@ -119,7 +130,7 @@ exports.handler = async (event) => {
         "content-encoding": "identity",
         "cache-control": "no-store",
         "x-bh-debug": `compressed|q=${quality}|grayscale=${grayscale}|useWebp=${useWebp}`,
-        ...headers, // includes content-type: image/webp or image/jpeg, lengths, savings
+        ...headers,
       }
     };
   } catch (e) {

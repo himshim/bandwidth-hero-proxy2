@@ -4,7 +4,6 @@ const compress = require("../util/compress");
 
 const DEFAULT_QUALITY = process.env.DEFAULT_QUALITY || 40;
 
-/** helper to respond with consistent headers */
 function respond(statusCode, body, {
   contentType = "text/plain; charset=utf-8",
   extraHeaders = {},
@@ -15,11 +14,9 @@ function respond(statusCode, body, {
     body,
     isBase64Encoded,
     headers: {
-      // CORS for extension/background contexts
       "access-control-allow-origin": "*",
       "access-control-allow-headers": "*",
       "access-control-allow-methods": "GET,HEAD,OPTIONS",
-      // make handshake unambiguous
       "content-type": contentType,
       "content-encoding": "identity",
       "cache-control": "no-cache",
@@ -32,21 +29,18 @@ exports.handler = async (event) => {
   try {
     const method = (event.httpMethod || "GET").toUpperCase();
 
-    // Preflight & HEAD support (some extension builds probe with HEAD)
     if (method === "OPTIONS") return respond(204, "");
-    if (method === "HEAD")   return respond(200, "");
+    if (method === "HEAD") return respond(200, "");
 
-    // Read query params
     const { url, jpeg, bw, l } = event.queryStringParameters || {};
 
-    // Verification response for Bandwidth Hero (must be exact + text/plain)
+    // ✅ Bandwidth Hero expects this exact string
     if (!url) {
-      return respond(200, "Bandwidth Hero Data Compression Service", {
+      return respond(200, "bandwidth-hero-proxy", {
         contentType: "text/plain"
       });
     }
 
-    // Normalize incoming url (array/JSON/Opera-mini rewrite)
     let targetUrl = url;
     try { targetUrl = JSON.parse(url); } catch {}
     if (Array.isArray(targetUrl)) targetUrl = targetUrl.join("&url=");
@@ -55,12 +49,10 @@ exports.handler = async (event) => {
       "http://"
     );
 
-    // Parameters from extension
-    const useWebp   = !jpeg;          // default to webp unless jpeg=1
+    const useWebp   = !jpeg;
     const grayscale = bw == "1";
     const quality   = parseInt(l, 10) || DEFAULT_QUALITY;
 
-    // Fetch original resource (Node 18 native fetch)
     const response = await fetch(targetUrl, {
       headers: {
         ...pick(event.headers || {}, ["cookie", "dnt", "referer"]),
@@ -72,7 +64,6 @@ exports.handler = async (event) => {
     });
 
     if (!response.ok) {
-      // propagate status so the extension can react appropriately
       return respond(response.status, "Failed to fetch image");
     }
 
@@ -81,7 +72,6 @@ exports.handler = async (event) => {
     const contentType = response.headers.get("content-type") || "";
     const originalLen = sourceBuf.length;
 
-    // Bypass if compression not beneficial/needed
     if (!shouldCompress(contentType, originalLen, useWebp)) {
       return respond(
         200,
@@ -96,7 +86,6 @@ exports.handler = async (event) => {
       );
     }
 
-    // Compress with Sharp
     const { err, output, headers } = await compress(
       sourceBuf,
       useWebp,
@@ -109,7 +98,6 @@ exports.handler = async (event) => {
       return respond(500, "Compression failed");
     }
 
-    // Return compressed image (base64) with image headers from util/compress
     return {
       statusCode: 200,
       body: output.toString("base64"),
@@ -119,7 +107,7 @@ exports.handler = async (event) => {
         "access-control-allow-headers": "*",
         "access-control-allow-methods": "GET,HEAD,OPTIONS",
         "content-encoding": "identity",
-        ...headers, // includes proper `content-type: image/webp|jpeg`, sizes, savings
+        ...headers,
       }
     };
   } catch (e) {

@@ -10,7 +10,7 @@
   <div class="max-w-4xl mx-auto p-6">
     <h1 class="text-2xl font-bold">Bandwidth Hero Proxy — Debug Tool</h1>
     <p class="mt-2 text-sm text-gray-600">
-      Test your Netlify function: see response headers and the actual compressed image.
+      This tool fetches your Netlify compression function, shows response headers, and previews the compressed image.
     </p>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2">
@@ -75,20 +75,6 @@
       el.textContent += (typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2)) + '\n';
     };
 
-    // base64 -> Uint8Array
-    function base64ToBytes(b64) {
-      try {
-        const binStr = atob(b64.replace(/\s/g, '')); // remove whitespace/newlines if any
-        const len = binStr.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
-        return bytes;
-      } catch (e) {
-        log('base64 decode error: ' + e.message);
-        return null;
-      }
-    }
-
     const base = `${window.location.origin}/api/index`;
 
     document.getElementById('run').addEventListener('click', async () => {
@@ -115,42 +101,45 @@
 
       try {
         log('Request URL: ' + url);
+
+        // First do a HEAD to read headers (optional but nice)
+        let headHeaders = {};
+        try {
+          const headRes = await fetch(url, { method: 'HEAD' });
+          headRes.headers.forEach((v, k) => headHeaders[k.toLowerCase()] = v);
+        } catch (e) {
+          log('HEAD failed (not critical): ' + e.message);
+        }
+
+        // Now GET the actual image as binary
         const res = await fetch(url);
         const headers = {};
         res.headers.forEach((v, k) => headers[k.toLowerCase()] = v);
-        headersEl.textContent = JSON.stringify(headers, null, 2);
 
-        const text = await res.text(); // base64 body from function
-        log('Body length (base64 chars): ' + text.length);
+        // Merge any HEAD headers we got first
+        headersEl.textContent = JSON.stringify({ ...headHeaders, ...headers }, null, 2);
 
-        const ctype = headers["content-type"] || "image/webp";
         if (!res.ok) {
-          status.textContent = `Error ${res.status}: ${text.slice(0, 200)}`;
+          const errText = await res.text().catch(() => '');
+          status.textContent = `Error ${res.status}: ${errText.slice(0, 200)}`;
           log('Non-OK status: ' + res.status);
           return;
         }
+
+        const ctype = headers["content-type"] || "image/webp";
         if (!ctype.includes('image/')) {
           status.textContent = `Unexpected content-type: ${ctype}`;
           log('Unexpected content-type: ' + ctype);
           return;
         }
-        if (!text) {
-          status.textContent = 'Empty body';
-          log('Empty body');
-          return;
-        }
 
-        // Prefer Blob URL over data: URI for reliability
-        const bytes = base64ToBytes(text);
-        if (!bytes) {
-          status.textContent = 'Failed to decode base64';
-          return;
-        }
-        const blob = new Blob([bytes], { type: ctype });
+        // IMPORTANT: Netlify already decoded base64 → we receive raw bytes here
+        const buf = await res.arrayBuffer();
+        const blob = new Blob([buf], { type: ctype });
         const objUrl = URL.createObjectURL(blob);
 
         preview.src = objUrl;
-        meta.textContent = `${ctype} • ${bytes.byteLength} bytes | ${headers["x-bh-debug"] || "OK"}`;
+        meta.textContent = `${ctype} • ${buf.byteLength} bytes | ${headers["x-bh-debug"] || "OK"}`;
         dl.href = objUrl;
         dl.classList.remove('hidden');
 

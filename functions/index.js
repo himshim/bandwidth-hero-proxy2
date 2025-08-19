@@ -7,29 +7,29 @@ const DEFAULT_QUALITY = process.env.DEFAULT_QUALITY || 40;
 // Main Netlify Function
 exports.handler = async (event) => {
   try {
-    // Health check endpoint
-    if (event.path === "/api/health") {
-      return { statusCode: 200, body: "OK" };
-    }
-
-    // Get query params
-    let { url, jpeg, bw, l } = event.queryStringParameters || {};
+    // Health check + extension verification
+    const { url, jpeg, bw, l } = event.queryStringParameters || {};
     if (!url) {
-      return { statusCode: 200, body: "Bandwidth Hero Data Compression Service" };
+      return {
+        statusCode: 200,
+        headers: { "content-type": "text/plain" }, // 👈 force plain text
+        body: "Bandwidth Hero Data Compression Service"
+      };
     }
 
     // If URL is array or JSON, normalize it
-    try { url = JSON.parse(url); } catch {}
-    if (Array.isArray(url)) url = url.join("&url=");
-    url = url.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
+    let targetUrl = url;
+    try { targetUrl = JSON.parse(url); } catch {}
+    if (Array.isArray(targetUrl)) targetUrl = targetUrl.join("&url=");
+    targetUrl = targetUrl.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
     // Params
     const useWebp = !jpeg;
     const grayscale = bw == "1";
     const quality = parseInt(l, 10) || DEFAULT_QUALITY;
 
-    // Fetch original image (use built-in fetch from Node 18)
-    const response = await fetch(url, {
+    // Fetch original image (Node 18 has native fetch)
+    const response = await fetch(targetUrl, {
       headers: {
         ...pick(event.headers, ["cookie", "dnt", "referer"]),
         "user-agent": "Bandwidth-Hero Compressor",
@@ -52,7 +52,10 @@ exports.handler = async (event) => {
         statusCode: 200,
         body: buffer.toString("base64"),
         isBase64Encoded: true,
-        headers: { "content-encoding": "identity", "content-type": contentType },
+        headers: {
+          "content-encoding": "identity",
+          "content-type": contentType
+        },
       };
     }
 

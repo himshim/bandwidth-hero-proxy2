@@ -10,7 +10,7 @@
   <div class="max-w-4xl mx-auto p-6">
     <h1 class="text-2xl font-bold">Bandwidth Hero Proxy — Debug Tool</h1>
     <p class="mt-2 text-sm text-gray-600">
-      This tool fetches your Netlify compression function, shows response headers, and previews the compressed image.
+      Test your Netlify function: see response headers and the actual compressed image.
     </p>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2">
@@ -28,7 +28,7 @@
         <label class="block">
           <span class="text-sm font-medium">Grayscale (bw)</span>
           <select id="bw" class="mt-1 w-full border rounded p-2">
-            <option value="0">No</option>
+            <option value="0" selected>No</option>
             <option value="1">Yes</option>
           </select>
         </label>
@@ -53,12 +53,42 @@
       </div>
       <div>
         <h2 class="font-semibold">Preview</h2>
-        <img id="preview" alt="compressed preview" class="mt-2 border rounded max-w-full"/>
+        <div class="mt-2">
+          <img id="preview" alt="compressed preview" class="border rounded max-w-full"/>
+          <div class="mt-2 text-xs text-gray-600">
+            <span id="meta"></span>
+            <a id="download" href="#" download="compressed-image" class="ml-2 text-blue-600 underline hidden">Download</a>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <div class="mt-6">
+      <h2 class="font-semibold">Debug Console</h2>
+      <pre id="console" class="mt-2 text-xs bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap"></pre>
     </div>
   </div>
 
   <script>
+    const log = (msg) => {
+      const el = document.getElementById('console');
+      el.textContent += (typeof msg === 'string' ? msg : JSON.stringify(msg, null, 2)) + '\n';
+    };
+
+    // base64 -> Uint8Array
+    function base64ToBytes(b64) {
+      try {
+        const binStr = atob(b64.replace(/\s/g, '')); // remove whitespace/newlines if any
+        const len = binStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+        return bytes;
+      } catch (e) {
+        log('base64 decode error: ' + e.message);
+        return null;
+      }
+    }
+
     const base = `${window.location.origin}/api/index`;
 
     document.getElementById('run').addEventListener('click', async () => {
@@ -73,27 +103,61 @@
       const status = document.getElementById('status');
       const headersEl = document.getElementById('headers');
       const preview = document.getElementById('preview');
+      const meta = document.getElementById('meta');
+      const dl = document.getElementById('download');
 
       status.textContent = 'Fetching...';
       headersEl.textContent = '';
       preview.removeAttribute('src');
+      meta.textContent = '';
+      dl.classList.add('hidden');
+      dl.removeAttribute('href');
 
       try {
+        log('Request URL: ' + url);
         const res = await fetch(url);
         const headers = {};
-        res.headers.forEach((v, k) => headers[k] = v);
+        res.headers.forEach((v, k) => headers[k.toLowerCase()] = v);
         headersEl.textContent = JSON.stringify(headers, null, 2);
 
-        const text = await res.text(); // base64 body
+        const text = await res.text(); // base64 body from function
+        log('Body length (base64 chars): ' + text.length);
+
         const ctype = headers["content-type"] || "image/webp";
-        if (res.ok && text && ctype.includes("image/")) {
-          preview.src = `data:${ctype};base64,${text}`;
-          status.textContent = headers["x-bh-debug"] || "OK";
-        } else {
+        if (!res.ok) {
           status.textContent = `Error ${res.status}: ${text.slice(0, 200)}`;
+          log('Non-OK status: ' + res.status);
+          return;
         }
+        if (!ctype.includes('image/')) {
+          status.textContent = `Unexpected content-type: ${ctype}`;
+          log('Unexpected content-type: ' + ctype);
+          return;
+        }
+        if (!text) {
+          status.textContent = 'Empty body';
+          log('Empty body');
+          return;
+        }
+
+        // Prefer Blob URL over data: URI for reliability
+        const bytes = base64ToBytes(text);
+        if (!bytes) {
+          status.textContent = 'Failed to decode base64';
+          return;
+        }
+        const blob = new Blob([bytes], { type: ctype });
+        const objUrl = URL.createObjectURL(blob);
+
+        preview.src = objUrl;
+        meta.textContent = `${ctype} • ${bytes.byteLength} bytes | ${headers["x-bh-debug"] || "OK"}`;
+        dl.href = objUrl;
+        dl.classList.remove('hidden');
+
+        status.textContent = headers["x-bh-debug"] || "OK";
       } catch (e) {
         status.textContent = `Fetch error: ${e.message}`;
+        log('Exception: ' + e.message);
       }
     });
   </script>

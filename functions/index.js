@@ -29,32 +29,31 @@ exports.handler = async (event) => {
   try {
     const method = (event.httpMethod || "GET").toUpperCase();
 
+    // Preflight & HEAD (some extensions probe with HEAD)
     if (method === "OPTIONS") return respond(204, "");
     if (method === "HEAD") return respond(200, "");
 
     const { url, jpeg, bw, l } = event.queryStringParameters || {};
 
-    // ✅ Bandwidth Hero expects this exact string
+    // Handshake (must be exact)
     if (!url) {
-      return respond(200, "bandwidth-hero-proxy", {
-        contentType: "text/plain"
-      });
+      return respond(200, "bandwidth-hero-proxy", { contentType: "text/plain" });
     }
 
+    // Normalize url
     let targetUrl = url;
     try { targetUrl = JSON.parse(url); } catch {}
     if (Array.isArray(targetUrl)) targetUrl = targetUrl.join("&url=");
-    targetUrl = targetUrl.replace(
-      /http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i,
-      "http://"
-    );
+    targetUrl = targetUrl.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-    const useWebp   = !jpeg;
+    const useWebp   = !jpeg;            // default: webp
     const grayscale = bw == "1";
     const quality   = parseInt(l, 10) || DEFAULT_QUALITY;
 
+    // Fetch original image with explicit Accept
     const response = await fetch(targetUrl, {
       headers: {
+        Accept: "image/*,*/*;q=0.8",
         ...pick(event.headers || {}, ["cookie", "dnt", "referer"]),
         "user-agent": "Bandwidth-Hero Compressor",
         "x-forwarded-for": (event.headers && event.headers["x-forwarded-for"]) || event.ip,
@@ -64,7 +63,9 @@ exports.handler = async (event) => {
     });
 
     if (!response.ok) {
-      return respond(response.status, "Failed to fetch image");
+      return respond(response.status, "Failed to fetch image", {
+        extraHeaders: { "x-bh-debug": `fetch_not_ok:${response.status}` }
+      });
     }
 
     const arrayBuf    = await response.arrayBuffer();
@@ -72,7 +73,11 @@ exports.handler = async (event) => {
     const contentType = response.headers.get("content-type") || "";
     const originalLen = sourceBuf.length;
 
-    if (!shouldCompress(contentType, originalLen, useWebp)) {
+    // Decide to compress or pass-through
+    const should = shouldCompress(contentType, originalLen, useWebp);
+
+    if (!should) {
+      // Pass-through unchanged (base64) with debug so you can see why it bypassed
       return respond(
         200,
         sourceBuf.toString("base64"),
@@ -80,12 +85,14 @@ exports.handler = async (event) => {
           contentType: contentType || "application/octet-stream",
           isBase64Encoded: true,
           extraHeaders: {
+            "x-bh-debug": `bypass:${contentType}|len=${originalLen}|useWebp=${useWebp}`,
             "x-original-size": String(originalLen)
           }
         }
       );
     }
 
+    // Compress with Sharp
     const { err, output, headers } = await compress(
       sourceBuf,
       useWebp,
@@ -95,9 +102,12 @@ exports.handler = async (event) => {
     );
 
     if (err) {
-      return respond(500, "Compression failed");
+      return respond(500, "Compression failed", {
+        extraHeaders: { "x-bh-debug": `sharp_error` }
+      });
     }
 
+    // Success: return compressed image (base64) + sharp-provided headers
     return {
       statusCode: 200,
       body: output.toString("base64"),
@@ -107,10 +117,14 @@ exports.handler = async (event) => {
         "access-control-allow-headers": "*",
         "access-control-allow-methods": "GET,HEAD,OPTIONS",
         "content-encoding": "identity",
-        ...headers,
+        "cache-control": "no-store",
+        "x-bh-debug": `compressed|q=${quality}|grayscale=${grayscale}|useWebp=${useWebp}`,
+        ...headers, // includes content-type: image/webp or image/jpeg, lengths, savings
       }
     };
   } catch (e) {
-    return respond(500, `Error: ${e.message || "Internal Error"}`);
+    return respond(500, `Error: ${e.message || "Internal Error"}`, {
+      extraHeaders: { "x-bh-debug": "exception" }
+    });
   }
 };

@@ -1,24 +1,25 @@
 {
   "name": "bandwidth-hero-proxy2",
-  "version": "1.0.0",
-  "description": "Serverless image compression proxy for Bandwidth Hero",
-  "main": "functions/index.js",
+  "version": "1.0.1",
+  "description": "Data compression service that converts images to low-res WebP or JPEG on the fly. Used in Bandwidth-Hero browser extension.",
+  "license": "MIT",
   "scripts": {
     "start": "netlify dev",
     "start:local": "node server.js",
-    "build": "netlify build"
+    "test": "jest tests/index.test.js"
   },
   "dependencies": {
-    "sharp": "^0.34.3",
+    "node-fetch": "^2.7.0",
+    "sharp": "^0.32.4",
     "axios": "^1.7.7",
     "express": "^4.21.0",
     "node-cache": "^5.1.2"
   },
   "devDependencies": {
-    "netlify-cli": "^17.33.4"
+    "netlify-cli": "^17.33.4",
+    "jest": "^27.4.5"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "license": "MIT"
+  }
 }

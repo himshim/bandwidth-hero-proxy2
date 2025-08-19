@@ -34,10 +34,11 @@ Click the button below to deploy your own proxy service on Netlify:
 ---
 
 ## 📝 Notes
+## 📝 Notes
+- Compression quality is usually set **from the Bandwidth Hero extension** (via its slider).  
+- If the extension does not specify a quality, the proxy uses `DEFAULT_QUALITY` (default = 40, can be changed in Netlify environment variables).  
 - Images are fetched and compressed **on-the-fly**. Nothing is stored.  
-- Default compression quality = **40** (can be changed via Netlify environment variable `DEFAULT_QUALITY`).  
-- Works best with image-heavy websites where bandwidth savings matter.  
-
+- Works best with image-heavy websites where bandwidth savings matter.
 ---
 
 ## 🙏 Credits

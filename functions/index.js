@@ -90,6 +90,7 @@ exports.handler = async (event) => {
     const should = shouldCompress(contentType, originalLen);
 
     if (!should) {
+      // IMPORTANT: include content-length on bypass too
       return respond(
         200,
         sourceBuf.toString("base64"),
@@ -97,8 +98,10 @@ exports.handler = async (event) => {
           contentType: contentType || "application/octet-stream",
           isBase64Encoded: true,
           extraHeaders: {
+            "content-length": String(originalLen),
             "x-bh-debug": `bypass:${contentType}|len=${originalLen}|useWebp=${useWebp}`,
-            "x-original-size": String(originalLen)
+            "x-original-size": String(originalLen),
+            "x-bytes-saved": "0"
           }
         }
       );
@@ -130,7 +133,7 @@ exports.handler = async (event) => {
         "content-encoding": "identity",
         "cache-control": "no-store",
         "x-bh-debug": `compressed|q=${quality}|grayscale=${grayscale}|useWebp=${useWebp}`,
-        ...headers,
+        ...headers, // includes `content-type`, `content-length`, `x-original-size`, `x-bytes-saved`
       }
     };
   } catch (e) {

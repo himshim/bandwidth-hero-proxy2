@@ -4,23 +4,27 @@ const compress = require("../util/compress");
 
 const DEFAULT_QUALITY = process.env.DEFAULT_QUALITY || 40;
 
-// Small helper to ensure consistent headers (CORS + plain text default)
-function withHeaders(statusCode, body, extra = {}, isBase64Encoded = false) {
+/** helper to respond with consistent headers */
+function respond(statusCode, body, {
+  contentType = "text/plain; charset=utf-8",
+  extraHeaders = {},
+  isBase64Encoded = false
+} = {}) {
   return {
     statusCode,
     body,
     isBase64Encoded,
     headers: {
-      // CORS: allow extension/background scripts
+      // CORS for extension/background contexts
       "access-control-allow-origin": "*",
       "access-control-allow-headers": "*",
       "access-control-allow-methods": "GET,HEAD,OPTIONS",
-      // For plain text responses
-      "content-type": extra["content-type"] || "text/plain; charset=utf-8",
-      // identity to avoid weird encodings
+      // make handshake unambiguous
+      "content-type": contentType,
       "content-encoding": "identity",
-      ...extra,
-    },
+      "cache-control": "no-cache",
+      ...extraHeaders,
+    }
   };
 }
 
@@ -28,24 +32,21 @@ exports.handler = async (event) => {
   try {
     const method = (event.httpMethod || "GET").toUpperCase();
 
-    // Handle preflight / HEAD cleanly so the extension is happy
-    if (method === "OPTIONS") {
-      return withHeaders(204, ""); // No Content
-    }
-    if (method === "HEAD") {
-      // Return the same headers the GET would return for validation
-      return withHeaders(200, "");
-    }
+    // Preflight & HEAD support (some extension builds probe with HEAD)
+    if (method === "OPTIONS") return respond(204, "");
+    if (method === "HEAD")   return respond(200, "");
 
-    // Query params
+    // Read query params
     const { url, jpeg, bw, l } = event.queryStringParameters || {};
 
-    // Verification / landing response (exact plain text the extension expects)
+    // Verification response for Bandwidth Hero (must be exact + text/plain)
     if (!url) {
-      return withHeaders(200, "Bandwidth Hero Data Compression Service");
+      return respond(200, "Bandwidth Hero Data Compression Service", {
+        contentType: "text/plain"
+      });
     }
 
-    // Normalize URL value (array / JSON / legacy Opera mini rewrite)
+    // Normalize incoming url (array/JSON/Opera-mini rewrite)
     let targetUrl = url;
     try { targetUrl = JSON.parse(url); } catch {}
     if (Array.isArray(targetUrl)) targetUrl = targetUrl.join("&url=");
@@ -54,59 +55,61 @@ exports.handler = async (event) => {
       "http://"
     );
 
-    // Params from extension
-    const useWebp = !jpeg;
+    // Parameters from extension
+    const useWebp   = !jpeg;          // default to webp unless jpeg=1
     const grayscale = bw == "1";
-    const quality = parseInt(l, 10) || DEFAULT_QUALITY;
+    const quality   = parseInt(l, 10) || DEFAULT_QUALITY;
 
-    // Fetch original image (Node 18 native fetch)
+    // Fetch original resource (Node 18 native fetch)
     const response = await fetch(targetUrl, {
       headers: {
-        ...pick(event.headers, ["cookie", "dnt", "referer"]),
+        ...pick(event.headers || {}, ["cookie", "dnt", "referer"]),
         "user-agent": "Bandwidth-Hero Compressor",
-        "x-forwarded-for": event.headers?.["x-forwarded-for"] || event.ip,
+        "x-forwarded-for": (event.headers && event.headers["x-forwarded-for"]) || event.ip,
         via: "1.1 bandwidth-hero",
       },
       redirect: "follow",
     });
 
     if (!response.ok) {
-      // Propagate status so the extension knows what happened
-      return withHeaders(response.status, "Failed to fetch image");
+      // propagate status so the extension can react appropriately
+      return respond(response.status, "Failed to fetch image");
     }
 
-    const arrayBuf = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuf);
+    const arrayBuf    = await response.arrayBuffer();
+    const sourceBuf   = Buffer.from(arrayBuf);
     const contentType = response.headers.get("content-type") || "";
-    const originalSize = buffer.length;
+    const originalLen = sourceBuf.length;
 
-    // If we shouldn't compress, pass-through
-    if (!shouldCompress(contentType, originalSize, useWebp)) {
-      return withHeaders(
+    // Bypass if compression not beneficial/needed
+    if (!shouldCompress(contentType, originalLen, useWebp)) {
+      return respond(
         200,
-        buffer.toString("base64"),
+        sourceBuf.toString("base64"),
         {
-          "content-type": contentType || "application/octet-stream",
-          "x-original-size": String(originalSize),
-        },
-        true // base64
+          contentType: contentType || "application/octet-stream",
+          isBase64Encoded: true,
+          extraHeaders: {
+            "x-original-size": String(originalLen)
+          }
+        }
       );
     }
 
     // Compress with Sharp
     const { err, output, headers } = await compress(
-      buffer,
+      sourceBuf,
       useWebp,
       grayscale,
       quality,
-      originalSize
+      originalLen
     );
 
     if (err) {
-      return withHeaders(500, "Compression failed");
+      return respond(500, "Compression failed");
     }
 
-    // Return compressed image (base64)
+    // Return compressed image (base64) with image headers from util/compress
     return {
       statusCode: 200,
       body: output.toString("base64"),
@@ -116,10 +119,10 @@ exports.handler = async (event) => {
         "access-control-allow-headers": "*",
         "access-control-allow-methods": "GET,HEAD,OPTIONS",
         "content-encoding": "identity",
-        ...headers, // includes correct image content-type + sizes
-      },
+        ...headers, // includes proper `content-type: image/webp|jpeg`, sizes, savings
+      }
     };
   } catch (e) {
-    return withHeaders(500, `Error: ${e.message || "Internal Error"}`);
+    return respond(500, `Error: ${e.message || "Internal Error"}`);
   }
 };

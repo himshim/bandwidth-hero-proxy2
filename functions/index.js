@@ -80,7 +80,7 @@ exports.handler = async (e, t) => {
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
-      body: "Bandwidth Hero Data Compression Service",
+      body: "bandwidth-hero-proxy"",
     };
 
   try {

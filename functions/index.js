@@ -5,16 +5,15 @@
  * Serverless port:        adi-g15/bandwidth-hero-proxy (MIT)
  * This repo:              himshim/bandwidth-hero-proxy2 (MIT)
  *
- * Fix 1 — Cloudflare bypass (real browser header forwarding):
+ * Fix 1 — CORS headers on every response so Chrome extension can validate
+ * Fix 2 — Cloudflare bypass (real browser header forwarding):
  *   Technique from ukind/bandwidth-hero-proxy2 by github.com/ukind (MIT)
  *   https://github.com/ukind/bandwidth-hero-proxy2
- *
- * Fix 2 — URL validation & SSRF protection
- * Fix 3 — 8-second fetch timeout via Promise.race()
- *          (node-fetch v2 does not support AbortController/signal,
- *           so Promise.race() is used instead)
- * Fix 4 — Reject non-image responses (e.g. Cloudflare CAPTCHA HTML pages)
- * Fix 5 — Follow HTTP->HTTPS redirect chains
+ * Fix 3 — URL validation & SSRF protection
+ * Fix 4 — 8-second fetch timeout via Promise.race()
+ *          (node-fetch v2 does not support AbortController/signal)
+ * Fix 5 — Reject non-image responses (e.g. Cloudflare CAPTCHA HTML pages)
+ * Fix 6 — Follow HTTP->HTTPS redirect chains
  *
  * Note: x-original-size and x-bytes-saved are already returned by
  * util/compress.js inside the `g` headers object — not added again here.
@@ -26,7 +25,17 @@ const pick = require("../util/pick"),
   compress = require("../util/compress"),
   DEFAULT_QUALITY = 40;
 
-// ---- Fix 2: URL validation & SSRF protection --------------------------------
+// Fix 1: CORS headers added to every response so the Chrome extension
+// can successfully validate the service URL. Without these, the browser
+// blocks the extension's fetch request with a CORS error even though
+// the function is working correctly.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+};
+
+// ---- Fix 3: URL validation & SSRF protection --------------------------------
 function isValidUrl(str) {
   try {
     const u = new URL(str);
@@ -49,9 +58,7 @@ function isPrivateHost(hostname) {
 }
 // -----------------------------------------------------------------------------
 
-// ---- Fix 3: Timeout helper (works with node-fetch v2) -----------------------
-// node-fetch v2 does not support AbortController/signal.
-// Promise.race() pits the fetch against a timer that rejects after 8 seconds.
+// ---- Fix 4: Timeout helper (works with node-fetch v2) -----------------------
 function fetchWithTimeout(url, options, ms) {
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error("FETCH_TIMEOUT")), ms)
@@ -61,11 +68,20 @@ function fetchWithTimeout(url, options, ms) {
 // -----------------------------------------------------------------------------
 
 exports.handler = async (e, t) => {
+  // Handle CORS preflight OPTIONS request
+  if (e.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: CORS_HEADERS, body: "" };
+  }
+
   let { url: r } = e.queryStringParameters,
     { jpeg: s, bw: o, l: a } = e.queryStringParameters;
 
   if (!r)
-    return { statusCode: 200, body: "Bandwidth Hero Data Compression Service" };
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: "Bandwidth Hero Data Compression Service",
+    };
 
   try {
     r = JSON.parse(r);
@@ -73,13 +89,13 @@ exports.handler = async (e, t) => {
   Array.isArray(r) && (r = r.join("&url="));
   r = r.replace(/http:\/\/1\.1\.\d\.\d\/bmi\/(https?:\/\/)?/i, "http://");
 
-  // -- Fix 2: Validate URL before doing anything with it ---------------------
+  // -- Fix 3: Validate URL before doing anything with it ---------------------
   if (!isValidUrl(r)) {
-    return { statusCode: 400, body: "Invalid URL" };
+    return { statusCode: 400, headers: CORS_HEADERS, body: "Invalid URL" };
   }
   const parsedUrl = new URL(r);
   if (isPrivateHost(parsedUrl.hostname)) {
-    return { statusCode: 403, body: "Forbidden" };
+    return { statusCode: 403, headers: CORS_HEADERS, body: "Forbidden" };
   }
   // --------------------------------------------------------------------------
 
@@ -94,7 +110,7 @@ exports.handler = async (e, t) => {
       const response = await fetchWithTimeout(
         r,
         {
-          // -- Fix 1: Forward real browser headers (Cloudflare bypass) --------
+          // -- Fix 2: Forward real browser headers (Cloudflare bypass) --------
           // Credit: ukind/bandwidth-hero-proxy2
           //   https://github.com/ukind/bandwidth-hero-proxy2
           // The original sent "Bandwidth-Hero Compressor" as the user-agent,
@@ -115,13 +131,17 @@ exports.handler = async (e, t) => {
             "x-forwarded-for": e.headers["x-forwarded-for"] || e.ip,
             via: "1.1 bandwidth-hero",
           },
-          redirect: "follow", // Fix 5: follow HTTP->HTTPS redirect chains
+          redirect: "follow", // Fix 6: follow HTTP->HTTPS redirect chains
         },
-        8000 // Fix 3: 8 second timeout
+        8000 // Fix 4: 8 second timeout
       );
 
       if (!response.ok) {
-        return { statusCode: response.status || 302, body: "" };
+        return {
+          statusCode: response.status || 302,
+          headers: CORS_HEADERS,
+          body: "",
+        };
       }
 
       h = response.headers;
@@ -130,18 +150,23 @@ exports.handler = async (e, t) => {
 
     } catch (fetchErr) {
       if (fetchErr.message === "FETCH_TIMEOUT") {
-        return { statusCode: 504, body: "Upstream fetch timed out" };
+        return {
+          statusCode: 504,
+          headers: CORS_HEADERS,
+          body: "Upstream fetch timed out",
+        };
       }
       throw fetchErr;
     }
 
-    // -- Fix 4: Reject non-image responses ------------------------------------
+    // -- Fix 5: Reject non-image responses ------------------------------------
     // Cloudflare returns an HTML CAPTCHA page on blocked requests.
     // Without this check Sharp tries to compress HTML and crashes silently.
     if (l && !l.startsWith("image/")) {
       console.log("Non-image content-type received:", l, "for URL:", r);
       return {
         statusCode: 415,
+        headers: CORS_HEADERS,
         body: `Upstream returned non-image response (${l}). The origin may be blocking proxy requests.`,
       };
     }
@@ -156,7 +181,7 @@ exports.handler = async (e, t) => {
           statusCode: 200,
           body: c.toString("base64"),
           isBase64Encoded: !0,
-          headers: { "content-encoding": "identity", ...h },
+          headers: { ...CORS_HEADERS, "content-encoding": "identity", ...h },
         }
       );
 
@@ -171,10 +196,13 @@ exports.handler = async (e, t) => {
         isBase64Encoded: !0,
         // g already contains content-type, content-length,
         // x-original-size and x-bytes-saved from util/compress.js
-        headers: { "content-encoding": "identity", ...h, ...g },
+        headers: { ...CORS_HEADERS, "content-encoding": "identity", ...h, ...g },
       };
     }
   } catch (f) {
-    return console.error(f), { statusCode: 500, body: f.message || "" };
+    return (
+      console.error(f),
+      { statusCode: 500, headers: CORS_HEADERS, body: f.message || "" }
+    );
   }
 };

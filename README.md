@@ -50,6 +50,10 @@ Powered by [Sharp](https://github.com/lovell/sharp) for fast, high-quality image
 
 ---
 
+## Self-Hosting Instructions
+
+If you prefer to self-host this application instead of deploying it on Netlify, please see the [self-hosting guide](SELF_HOSTING.md) for detailed instructions on how to set up and run the application on your own server.
+
 ## Deployment
 
 ### One-Click Deploy to Netlify

@@ -2,3 +2,11 @@
 node_modules
 .env
 yarn-error.log
+
+# Local Netlify folder
+.netlify
+
+# Local Agent customizations & lockfiles
+.agents/
+deno.lock
+skills-lock.json

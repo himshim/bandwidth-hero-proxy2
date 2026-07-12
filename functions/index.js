@@ -6,10 +6,11 @@
  * This repo:              himshim/bandwidth-hero-proxy2 (MIT)
  */
 
-const pick           = require("../util/pick");
-const fetch          = require("node-fetch");
+
 const shouldCompress = require("../util/shouldCompress");
 const compress       = require("../util/compress");
+const { isValidUrl, isPrivateHost } = require("../util/validate");
+const { fetchWithRedirectCheck } = require("../util/fetch");
 
 const DEFAULT_QUALITY = 40;
 
@@ -27,33 +28,9 @@ const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=604800, max-age=3600, stale-while-revalidate=86400",
 };
 
-function isValidUrl(str) {
-  try {
-    const u = new URL(str);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
-function isPrivateHost(hostname) {
-  return [
-    /^localhost$/i,
-    /^127\./,
-    /^10\./,
-    /^192\.168\./,
-    /^172\.(1[6-9]|2\d|3[01])\./,
-    /^169\.254\./,
-    /^::1$/,
-  ].some((p) => p.test(hostname));
-}
 
-function fetchWithTimeout(url, options, ms) {
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("FETCH_TIMEOUT")), ms)
-  );
-  return Promise.race([fetch(url, options), timeout]);
-}
+
 
 exports.handler = async (e) => {
   if (e.httpMethod === "OPTIONS") {
@@ -105,33 +82,38 @@ exports.handler = async (e) => {
     let upstreamHeaders = {}, body, contentType;
 
     try {
-      const response = await fetchWithTimeout(
-        r,
-        {
-          headers: {
-            ...pick(e.headers, ["cookie", "dnt", "referer"]),
-            "user-agent":
-              e.headers["user-agent"] ||
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "accept":
-              e.headers["accept"] ||
-              "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-            "accept-language": e.headers["accept-language"] || "en-US,en;q=0.9",
-            "accept-encoding": "identity",
-            "x-forwarded-for": e.headers["x-forwarded-for"] || e.ip,
-            via: "1.1 bandwidth-hero",
-          },
-          redirect: "follow",
-        },
-        8000
-      );
+        const response = await fetchWithRedirectCheck(
+          r,
+          {
+            headers: {
+              ...(e.headers.cookie && { cookie: e.headers.cookie }),
+              ...(e.headers.dnt && { dnt: e.headers.dnt }),
+              ...(e.headers.referer && { referer: e.headers.referer }),
+              "user-agent":
+                e.headers["user-agent"] ||
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "accept":
+                e.headers["accept"] ||
+                "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+              "accept-language": e.headers["accept-language"] || "en-US,en;q=0.9",
+              "accept-encoding": "identity",
+              "x-forwarded-for": e.headers["x-forwarded-for"] || e.ip,
+              via: "1.1 bandwidth-hero",
+            },
+            timeout: 8000
+          }
+        );
 
       if (!response.ok) {
         return { statusCode: response.status || 302, headers: CORS_HEADERS, body: "" };
       }
 
-      upstreamHeaders = response.headers;
-      body            = await response.buffer();
+      upstreamHeaders = {};
+      response.headers.forEach((value, key) => {
+        upstreamHeaders[key] = value;
+      });
+      const arrayBuffer = await response.arrayBuffer();
+      body            = Buffer.from(arrayBuffer);
       contentType     = response.headers.get("content-type") || "";
 
     } catch (fetchErr) {

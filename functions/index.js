@@ -14,6 +14,9 @@ const { fetchWithRedirectCheck } = require("../util/fetch");
 
 const DEFAULT_QUALITY = 40;
 
+const BH_VERSION = "2.0.0";
+const BH_API     = 1;
+
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -26,6 +29,15 @@ const CORS_HEADERS = {
 // CDN cache hits never invoke this function at all.
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=604800, max-age=3600, stale-while-revalidate=86400",
+};
+
+// Protocol telemetry headers exposed on every successful image response.
+// Clients and diagnostics tools can use these to confirm proxy identity and API version.
+const BH_BACKEND_HEADERS = {
+  "x-bh-backend":  "bandwidth-proxy-2",
+  "x-bh-version":  BH_VERSION,
+  "x-bh-api":      String(BH_API),
+  "x-bh-features": "webp,grayscale,maxwidth,stats",
 };
 
 
@@ -146,8 +158,12 @@ exports.handler = async (e) => {
         headers: {
           ...CORS_HEADERS,
           ...CACHE_HEADERS,
-          "content-encoding": "identity",
+          "content-encoding":     "identity",
           ...upstreamHeaders,
+          ...BH_BACKEND_HEADERS,
+          "x-bh-original-size":   String(originalSize),
+          "x-bh-compressed-size": String(originalSize),
+          "x-bh-bytes-saved":     "0",
         },
       };
     }
@@ -172,9 +188,13 @@ exports.handler = async (e) => {
       headers: {
         ...CORS_HEADERS,
         ...CACHE_HEADERS,
-        "content-encoding": "identity",
+        "content-encoding":     "identity",
         ...upstreamHeaders,
         ...compressedHeaders,
+        ...BH_BACKEND_HEADERS,
+        "x-bh-original-size":   String(originalSize),
+        "x-bh-compressed-size": String(output.length),
+        "x-bh-bytes-saved":     String(originalSize - output.length),
       },
     };
 

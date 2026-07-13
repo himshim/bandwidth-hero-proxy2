@@ -15,9 +15,11 @@ exports.handler = async (event) => {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      status: "ok",
-      service: "bandwidth-hero-proxy",
-      version: "2.0.0"
+      status:   "ok",
+      service:  "Bandwidth Proxy 2",
+      version:  "2.0.0",
+      api:      1,
+      features: ["webp", "grayscale", "maxwidth", "stats"]
     })
   };
 };

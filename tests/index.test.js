@@ -4,6 +4,7 @@ const { test, expect, beforeAll, afterEach } = require("@jest/globals");
 jest.mock("sharp", () => {
   return jest.fn().mockImplementation(() => {
     return {
+      resize:   jest.fn().mockReturnThis(),
       grayscale: jest.fn().mockReturnThis(),
       toFormat: jest.fn().mockReturnThis(),
       toBuffer: jest.fn().mockResolvedValue({
@@ -233,4 +234,93 @@ test("Image Pipeline: successfully processes and compresses a valid image respon
   // Clean base64 payload should be parseable
   const outputBuffer = Buffer.from(response.body, "base64");
   expect(outputBuffer.toString()).toBe("fake-compressed-webp-data");
+});
+
+// ─── Protocol Header Tests ────────────────────────────────────────────────────
+
+function makeMockEvent(extra = {}) {
+  const jpegBuffer = Buffer.alloc(2000);
+  const headersMap = {
+    "content-type":   "image/jpeg",
+    "content-length": jpegBuffer.length.toString(),
+  };
+
+  global.fetch = jest.fn().mockResolvedValue({
+    status: 200,
+    ok: true,
+    headers: {
+      get:     (name) => headersMap[name.toLowerCase()] || null,
+      forEach: (cb)   => Object.entries(headersMap).forEach(([k, v]) => cb(v, k)),
+    },
+    arrayBuffer: () =>
+      Promise.resolve(
+        jpegBuffer.buffer.slice(jpegBuffer.byteOffset, jpegBuffer.byteOffset + jpegBuffer.byteLength)
+      ),
+  });
+
+  return {
+    headers: {},
+    queryStringParameters: {
+      url:     "https://legit-cdn.com/image.jpg",
+      quality: "50",
+      ...extra,
+    },
+  };
+}
+
+test("Protocol: x-bh-backend header identifies proxy on compressed response", async () => {
+  const response = await handler(makeMockEvent());
+  expect(response.headers["x-bh-backend"]).toBe("bandwidth-proxy-2");
+});
+
+test("Protocol: x-bh-version matches semantic version on compressed response", async () => {
+  const response = await handler(makeMockEvent());
+  expect(response.headers["x-bh-version"]).toMatch(/^\d+\.\d+\.\d+$/);
+});
+
+test("Protocol: x-bh-api reports integer API version as string on compressed response", async () => {
+  const response = await handler(makeMockEvent());
+  expect(response.headers["x-bh-api"]).toBe("1");
+});
+
+test("Protocol: x-bh-features is a comma-separated feature list on compressed response", async () => {
+  const response = await handler(makeMockEvent());
+  const features = response.headers["x-bh-features"].split(",");
+  expect(features).toEqual(expect.arrayContaining(["webp", "grayscale", "maxwidth", "stats"]));
+});
+
+test("Protocol: x-bh-original-size, x-bh-compressed-size, x-bh-bytes-saved present on compressed response", async () => {
+  const response = await handler(makeMockEvent());
+  expect(response.headers["x-bh-original-size"]).toBeDefined();
+  expect(response.headers["x-bh-compressed-size"]).toBeDefined();
+  expect(response.headers["x-bh-bytes-saved"]).toBeDefined();
+  // values should be numeric strings
+  expect(Number(response.headers["x-bh-original-size"])).toBeGreaterThan(0);
+  expect(Number(response.headers["x-bh-compressed-size"])).toBeGreaterThan(0);
+});
+
+test("Protocol: legacy x-original-size and x-bytes-saved headers still present (backward compat)", async () => {
+  const response = await handler(makeMockEvent());
+  expect(response.headers["x-original-size"]).toBeDefined();
+  expect(response.headers["x-bytes-saved"]).toBeDefined();
+});
+
+test("Protocol: grayscale param bw=1 accepted without error", async () => {
+  const response = await handler(makeMockEvent({ bw: "1" }));
+  expect(response.statusCode).toBe(200);
+});
+
+test("Protocol: jpeg param jpeg=1 accepted without error", async () => {
+  const response = await handler(makeMockEvent({ jpeg: "1" }));
+  expect(response.statusCode).toBe(200);
+});
+
+test("Protocol: legacy quality param l= accepted alongside quality=", async () => {
+  const response = await handler(makeMockEvent({ l: "70" }));
+  expect(response.statusCode).toBe(200);
+});
+
+test("Protocol: max_width param accepted without error", async () => {
+  const response = await handler(makeMockEvent({ max_width: "800" }));
+  expect(response.statusCode).toBe(200);
 });

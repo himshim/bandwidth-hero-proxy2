@@ -336,7 +336,7 @@
                 const healthRes = await fetch("/api/health");
                 if (healthRes.status === 200) {
                     const healthData = await healthRes.json();
-                    if (healthData.status === "ok" && healthData.service === "bandwidth-hero-proxy") {
+                    if (healthData.status === "ok") {
                         // Handshake check
                         const response = await fetch(proxyPath);
                         if (response.status === 200) {

@@ -1,17 +1,26 @@
 [build]
-  environment = { NODE_VERSION = "18" }
+  environment = { NODE_VERSION = "22" }
 
 [functions]
   directory = "functions/"
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  to   = "/.netlify/functions/:splat"
   status = 200
+
+# Security headers for the static homepage.
+# Function responses set their own headers in code.
+[[headers]]
+  for = "/"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
 
 [[headers]]
   for = "/api/*"
   [headers.values]
-    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Origin  = "*"
     Access-Control-Allow-Methods = "GET, OPTIONS"
     Access-Control-Allow-Headers = "*"

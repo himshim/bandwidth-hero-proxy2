@@ -5,11 +5,12 @@
   "license": "MIT",
   "scripts": {
     "start": "ntl dev",
-    "test": "jest tests/index.test.js"
+    "test": "jest"
   },
   "dependencies": {
-    "node-fetch": "^2.7.0",
-    "sharp": "^0.32.4",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
     "jest": "^27.4.5"
   }
 }

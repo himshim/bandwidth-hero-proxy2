@@ -68,6 +68,14 @@ https://your-netlify-domain.netlify.app/api/index
 
 Replace `your-netlify-domain` with the subdomain Netlify assigned to your deployment.
 
+### Verify Setup (Diagnostics)
+
+To confirm your deployment is running successfully, navigate to `https://your-netlify-domain.netlify.app` in your browser and click **Launch Diagnostics Suite**. The diagnostic suite will verify:
+* Proxy reachability and handshake
+* CORS permission configuration
+* Dynamic image fetching and WebP compression
+* Cache-Control header propagation
+
 ---
 
 ## API
@@ -101,9 +109,40 @@ bandwidth-hero-proxy2/
 
 ---
 
+## Local Development
+
+To run the proxy locally:
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the Netlify development server:
+   ```bash
+   npm run start
+   ```
+3. Open `http://localhost:8888` in your browser and click **Launch Diagnostics Suite** to verify your local instance.
+4. Run the test suite:
+   ```bash
+   npm test
+   ```
+
+---
+
+## Support Matrix
+
+| Component | Status | Description |
+|---|---|---|
+| Node.js 18+ | ✅ Supported | Required for native Fetch API |
+| Netlify | ✅ Supported (Official) | Primary serverless function host |
+| Extensions | ✅ Supported | Compatible with Bandwidth Guardian & Bandwidth Hero |
+| GitHub Actions CI | ✅ Configured | Automated build & test execution |
+
+---
+
 ## Tech Stack
 
-- **Runtime:** Node.js (Netlify Functions)
+- **Runtime:** Node.js (Netlify Functions, Node 18+)
 - **Image processing:** [Sharp](https://github.com/lovell/sharp)
 - **Output formats:** WebP, JPEG (progressive)
 - **Platform:** [Netlify](https://netlify.com)
@@ -115,6 +154,12 @@ bandwidth-hero-proxy2/
 - [Bandwidth Guardian](https://github.com/himshim/bandwidth-guardian) — MV3 extension built for this proxy
 - [Bandwidth Hero](https://github.com/ayastreb/bandwidth-hero) — original MV2 extension
 - [adi-g15/bandwidth-hero-proxy](https://github.com/adi-g15/bandwidth-hero-proxy) — the upstream fork this is based on
+
+---
+
+## Contributing
+
+Please read [CONTRIBUTING.md](./CONTRIBUTING.md) to understand our engineering principles, dependency rules, and release policies before opening a pull request.
 
 ---
 

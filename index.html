@@ -2,21 +2,423 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bandwidth Hero Proxy</title>
+    <title>Bandwidth Hero Proxy — Active Status</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --text-color: #c9d1d9;
+            --text-bright: #f0f6fc;
+            --primary: #1f6feb;
+            --primary-hover: #388bfd;
+            --success: #238636;
+            --success-hover: #2ea043;
+            --danger: #da3633;
+            --border-color: #30363d;
+            --card-bg: #161b22;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: #8b949e;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        ol {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+
+        code {
+            font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, "Liberation Mono", monospace;
+            background-color: rgba(110, 118, 129, 0.2);
+            padding: 3px 6px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #ff7b72;
+            word-break: break-all;
+        }
+
+        .btn {
+            display: inline-block;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.2s;
+            text-align: center;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            margin-top: 12px;
+        }
+
+        .btn-outline:hover {
+            background-color: #21262d;
+            border-color: #8b949e;
+        }
+
+        /* Diagnostics panel styling */
+        .diagnostics-panel {
+            display: none;
+            margin-top: 24px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+        }
+
+        .diagnostic-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .diagnostic-list {
+            list-style: none;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .diagnostic-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: #0d1117;
+        }
+
+        .diagnostic-label {
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+        }
+
+        .status-pending {
+            background-color: #30363d;
+            color: #8b949e;
+        }
+
+        .status-success {
+            background-color: rgba(35, 134, 54, 0.15);
+            color: #56d364;
+            border: 1px solid rgba(35, 134, 54, 0.3);
+        }
+
+        .status-failed {
+            background-color: rgba(218, 54, 51, 0.15);
+            color: #f85149;
+            border: 1px solid rgba(218, 54, 51, 0.3);
+        }
+
+        .metric-text {
+            font-size: 13px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+
+        footer {
+            margin-top: 32px;
+            text-align: center;
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        footer a {
+            color: var(--primary-hover);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <h1>Bandwidth Hero Proxy</h1>
-        <p>Welcome to the Bandwidth Hero Proxy!</p>
-        <p>To use the proxy in the Bandwidth Hero extension, follow these steps:</p>
-        <ol>
-            <li>Open the Bandwidth Hero extension settings.</li>
-            <li>In the Data Compression Service section, add the following URL: <code>https://your-netlify-domain.netlify.app/api/index</code>.</li>
-            <li>Save the settings and you are good to go!</li>
-        </ol>
-        <p>For more information and the source code, visit the <a href="https://github.com/himshim/bandwidth-hero-proxy2">GitHub repository</a>.</p>
+        <h1>⚡ Bandwidth Hero Proxy</h1>
+        <p class="subtitle">A serverless image compression service</p>
+
+        <div class="card">
+            <h3 style="color: var(--text-bright); margin-bottom: 12px; font-size: 16px;">Setup Instructions</h3>
+            <ol>
+                <li>Open the <strong>Bandwidth Guardian</strong> settings in your browser.</li>
+                <li>In the <strong>Proxy URL</strong> input, enter:
+                    <br>
+                    <code id="proxy-url-display">https://your-netlify-domain.netlify.app/api/index</code>
+                </li>
+                <li>Save settings and verify compression in your extension menu.</li>
+            </ol>
+        </div>
+
+        <button class="btn" id="run-diagnostics-btn">Launch Diagnostics Suite</button>
+
+        <div class="diagnostics-panel" id="diagnostics-panel">
+            <div class="diagnostic-header">
+                <span>System Test Suite</span>
+                <span style="font-size: 13px; color: #8b949e;" id="suite-status">Idle</span>
+            </div>
+            
+            <ul class="diagnostic-list">
+                <li class="diagnostic-item">
+                    <div>
+                        <div class="diagnostic-label">Proxy Reachable</div>
+                        <div class="metric-text" id="reachability-metric">Endpoint connection status</div>
+                    </div>
+                    <span class="status-badge status-pending" id="reachable-status">Pending</span>
+                </li>
+                <li class="diagnostic-item">
+                    <div>
+                        <div class="diagnostic-label">CORS Enabled</div>
+                        <div class="metric-text" id="cors-metric">Cross-Origin Resource Sharing status</div>
+                    </div>
+                    <span class="status-badge status-pending" id="cors-status">Pending</span>
+                </li>
+                <li class="diagnostic-item">
+                    <div>
+                        <div class="diagnostic-label">Image Fetch & Compression</div>
+                        <div class="metric-text" id="compress-metric">Verifying edge compression pipeline</div>
+                    </div>
+                    <span class="status-badge status-pending" id="compress-status">Pending</span>
+                </li>
+                <li class="diagnostic-item">
+                    <div>
+                        <div class="diagnostic-label">Caching & Headers</div>
+                        <div class="metric-text" id="cache-metric">Response headers and CDN caching integrity</div>
+                    </div>
+                    <span class="status-badge status-pending" id="cache-status">Pending</span>
+                </li>
+            </ul>
+        </div>
+
+        <footer>
+            <p>View source code on <a href="https://github.com/himshim/bandwidth-hero-proxy2" target="_blank">GitHub</a></p>
+        </footer>
     </div>
+
+    <script>
+        // Update setup instructions with current window domain
+        const currentOrigin = window.location.origin;
+        const proxyPath = "/api/index";
+        const fullProxyUrl = currentOrigin + proxyPath;
+        document.getElementById("proxy-url-display").innerText = fullProxyUrl;
+
+        const diagnosticsBtn = document.getElementById("run-diagnostics-btn");
+        const panel = document.getElementById("diagnostics-panel");
+        
+        diagnosticsBtn.addEventListener("click", async () => {
+            panel.style.display = "block";
+            diagnosticsBtn.innerText = "Running Diagnostics...";
+            diagnosticsBtn.disabled = true;
+            document.getElementById("suite-status").innerText = "Testing...";
+
+            resetStatus();
+
+            try {
+                // Test 1: Reachable & CORS
+                const reachableRes = await testReachability();
+                if (reachableRes) {
+                    // Test 2: Fetch & Compression (GitHub avatar test)
+                    await testCompression();
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                diagnosticsBtn.innerText = "Run Diagnostics Again";
+                diagnosticsBtn.disabled = false;
+                document.getElementById("suite-status").innerText = "Completed";
+            }
+        });
+
+        function resetStatus() {
+            const badges = ["reachable-status", "cors-status", "compress-status", "cache-status"];
+            badges.forEach(id => {
+                const badge = document.getElementById(id);
+                badge.className = "status-badge status-pending";
+                badge.innerText = "Pending";
+            });
+            document.getElementById("reachability-metric").innerText = "Endpoint connection status";
+            document.getElementById("cors-metric").innerText = "Cross-Origin Resource Sharing status";
+            document.getElementById("compress-metric").innerText = "Verifying edge compression pipeline";
+            document.getElementById("cache-metric").innerText = "Response headers and CDN caching integrity";
+        }
+
+        async function testReachability() {
+            const reachableBadge = document.getElementById("reachable-status");
+            const corsBadge = document.getElementById("cors-status");
+            
+            try {
+                // Check health endpoint
+                const healthRes = await fetch("/api/health");
+                if (healthRes.status === 200) {
+                    const healthData = await healthRes.json();
+                    if (healthData.status === "ok") {
+                        // Handshake check
+                        const response = await fetch(proxyPath);
+                        if (response.status === 200) {
+                            const text = await response.text();
+                            if (text === "bandwidth-hero-proxy") {
+                                reachableBadge.className = "status-badge status-success";
+                                reachableBadge.innerText = "Reachable";
+                                document.getElementById("reachability-metric").innerText = "Verified: Health active & Endpoint returned correct handshake";
+
+                                corsBadge.className = "status-badge status-success";
+                                corsBadge.innerText = "Passed";
+                                document.getElementById("cors-metric").innerText = "Verified: Browser successfully read proxy headers";
+                                return true;
+                            }
+                        }
+                    }
+                }
+                throw new Error("Invalid response");
+            } catch (err) {
+                reachableBadge.className = "status-badge status-failed";
+                reachableBadge.innerText = "Failed";
+                document.getElementById("reachability-metric").innerText = "Error connecting to health or handshake endpoint";
+
+                corsBadge.className = "status-badge status-failed";
+                corsBadge.innerText = "Failed";
+                document.getElementById("cors-metric").innerText = "Handshake blocked or incorrect";
+                return false;
+            }
+        }
+
+        async function testCompression() {
+            const compressBadge = document.getElementById("compress-status");
+            const cacheBadge = document.getElementById("cache-status");
+            
+            const testImgUrl = "https://avatars.githubusercontent.com/u/9919";
+            const targetUrl = `${proxyPath}?url=${encodeURIComponent(testImgUrl)}`;
+            
+            const start = Date.now();
+            try {
+                const response = await fetch(targetUrl);
+                const latency = Date.now() - start;
+                
+                if (response.status === 200) {
+                    const contentType = response.headers.get("content-type");
+                    const origSize = response.headers.get("x-original-size");
+                    const bytesSaved = response.headers.get("x-bytes-saved");
+                    const cacheControl = response.headers.get("cache-control");
+
+                    if (contentType && contentType.includes("image/")) {
+                        compressBadge.className = "status-badge status-success";
+                        compressBadge.innerText = "Succeeded";
+                        
+                        let infoString = `Latency: ${latency}ms | Format: ${contentType}`;
+                        if (origSize && bytesSaved) {
+                            const percent = ((bytesSaved / origSize) * 100).toFixed(1);
+                            infoString += ` | Saved ${percent}%`;
+                        }
+                        document.getElementById("compress-metric").innerText = infoString;
+
+                        if (cacheControl) {
+                            cacheBadge.className = "status-badge status-success";
+                            cacheBadge.innerText = "Active";
+                            document.getElementById("cache-metric").innerText = `Cache-Control: ${cacheControl}`;
+                        } else {
+                            cacheBadge.className = "status-badge status-failed";
+                            cacheBadge.innerText = "Missing";
+                            document.getElementById("cache-metric").innerText = "No Cache-Control headers returned";
+                        }
+                        return;
+                    }
+                }
+                throw new Error("Compression check failed");
+            } catch (err) {
+                compressBadge.className = "status-badge status-failed";
+                compressBadge.innerText = "Failed";
+                document.getElementById("compress-metric").innerText = "Pipeline check failed";
+
+                cacheBadge.className = "status-badge status-failed";
+                cacheBadge.innerText = "Failed";
+                document.getElementById("cache-metric").innerText = "Headers check aborted";
+            }
+        }
+    </script>
 </body>
 </html>

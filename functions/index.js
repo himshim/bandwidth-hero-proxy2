@@ -6,7 +6,6 @@
  * This repo:              himshim/bandwidth-hero-proxy2 (MIT)
  */
 
-
 const shouldCompress = require("../util/shouldCompress");
 const compress       = require("../util/compress");
 const { isValidUrl, isPrivateHost } = require("../util/validate");
@@ -23,16 +22,24 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "*",
 };
 
-// Cache-Control: Netlify CDN caches each compressed response at the edge.
-// The cache key is the full proxy URL (includes url + quality + bw + jpeg + max_width)
-// so every unique param combination gets its own cache entry.
-// CDN cache hits never invoke this function at all.
+// Netlify-CDN-Cache-Control: CDN-only directive, stripped before the browser sees it.
+//   durable   — share the cache entry across all edge nodes (not per-node).
+//   s-maxage  — keep compressed images at the edge for 7 days.
+//   stale-while-revalidate — serve stale while refreshing in the background.
+//
+// Cache-Control: browser directive — always revalidate, never serve stale.
+//   Prevents the browser disk cache from serving an old colour image after
+//   the user enables greyscale, or an old quality level after changing settings.
+//
+// Netlify-Vary: only vary the CDN cache key on the params that change the output.
+//   Stray params (utm_*, fbclid, etc.) are ignored — no cache fragmentation.
 const CACHE_HEADERS = {
-  "Cache-Control": "public, s-maxage=604800, max-age=3600, stale-while-revalidate=86400",
+  "Netlify-CDN-Cache-Control": "public, durable, s-maxage=604800, stale-while-revalidate=86400",
+  "Cache-Control":             "public, max-age=0, must-revalidate",
+  "Netlify-Vary":              "query=url|quality|bw|jpeg|max_width|l",
 };
 
 // Protocol telemetry headers exposed on every successful image response.
-// Clients and diagnostics tools can use these to confirm proxy identity and API version.
 const BH_BACKEND_HEADERS = {
   "x-bh-backend":  "bandwidth-proxy-2",
   "x-bh-version":  BH_VERSION,
@@ -40,9 +47,19 @@ const BH_BACKEND_HEADERS = {
   "x-bh-features": "webp,grayscale,maxwidth,stats",
 };
 
-
-
-
+// Headers that must NOT be forwarded from the upstream origin:
+//   - Hop-by-hop headers (RFC 7230 §6.1) — connection-scoped, meaningless end-to-end.
+//   - Headers the proxy sets itself — forwarding them would silently override our values.
+//   - Upstream security headers — scoped to the origin's domain, not ours.
+//   - CDN-internal headers (Cloudflare cf-*, age, via) — irrelevant to the client.
+const UPSTREAM_HEADER_DENYLIST = new Set([
+  "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+  "te", "trailer", "transfer-encoding", "upgrade",
+  "cache-control", "content-encoding", "content-length",
+  "set-cookie", "strict-transport-security",
+  "age", "via", "alt-svc", "server",
+  "cf-cache-status", "cf-ray",
+]);
 
 exports.handler = async (e) => {
   if (e.httpMethod === "OPTIONS") {
@@ -77,12 +94,9 @@ exports.handler = async (e) => {
   }
 
   // useWebp: true unless client explicitly sent jpeg=1.
-  // Original proxy used `!s` which treated both "0" and "1" as truthy strings
-  // and always returned WebP. Fixed with strict string comparison.
   const useWebp = s !== "1";
 
   // grayscale: only true when bw is explicitly "1".
-  // Original proxy used loose `0 != o` coercion — same result, made explicit here.
   const grayscale = o === "1";
 
   // Accept both param names for compatibility with original and our extension.
@@ -94,39 +108,42 @@ exports.handler = async (e) => {
     let upstreamHeaders = {}, body, contentType;
 
     try {
-        const response = await fetchWithRedirectCheck(
-          r,
-          {
-            headers: {
-              ...(e.headers.cookie && { cookie: e.headers.cookie }),
-              ...(e.headers.dnt && { dnt: e.headers.dnt }),
-              ...(e.headers.referer && { referer: e.headers.referer }),
-              "user-agent":
-                e.headers["user-agent"] ||
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-              "accept":
-                e.headers["accept"] ||
-                "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
-              "accept-language": e.headers["accept-language"] || "en-US,en;q=0.9",
-              "accept-encoding": "identity",
-              "x-forwarded-for": e.headers["x-forwarded-for"] || e.ip,
-              via: "1.1 bandwidth-hero",
-            },
-            timeout: 8000
-          }
-        );
+      const response = await fetchWithRedirectCheck(
+        r,
+        {
+          headers: {
+            ...(e.headers.cookie   && { cookie:   e.headers.cookie }),
+            ...(e.headers.dnt      && { dnt:      e.headers.dnt }),
+            ...(e.headers.referer  && { referer:  e.headers.referer }),
+            "user-agent":
+              e.headers["user-agent"] ||
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "accept":
+              e.headers["accept"] ||
+              "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "accept-language": e.headers["accept-language"] || "en-US,en;q=0.9",
+            "accept-encoding": "identity",
+            "x-forwarded-for": e.headers["x-forwarded-for"] || e.ip,
+            via: "1.1 bandwidth-hero",
+          },
+          timeout: 8000
+        }
+      );
 
       if (!response.ok) {
         return { statusCode: response.status || 302, headers: CORS_HEADERS, body: "" };
       }
 
-      upstreamHeaders = {};
+      // Forward only safe, non-conflicting headers from the upstream response.
       response.headers.forEach((value, key) => {
-        upstreamHeaders[key] = value;
+        if (!UPSTREAM_HEADER_DENYLIST.has(key.toLowerCase())) {
+          upstreamHeaders[key] = value;
+        }
       });
+
       const arrayBuffer = await response.arrayBuffer();
-      body            = Buffer.from(arrayBuffer);
-      contentType     = response.headers.get("content-type") || "";
+      body        = Buffer.from(arrayBuffer);
+      contentType = response.headers.get("content-type") || "";
 
     } catch (fetchErr) {
       if (fetchErr.message === "FETCH_TIMEOUT") {

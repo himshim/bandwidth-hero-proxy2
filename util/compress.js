@@ -13,13 +13,12 @@ function compress(input, useWebp, grayscale, quality, originalSize, maxWidth) {
     });
   }
 
+  // progressive + optimizeScans require a multi-pass encode — removed.
+  // For a proxy that returns the full image in one response, baseline encoding
+  // is faster with no quality difference perceived by the end user.
   return pipeline
     .grayscale(grayscale)
-    .toFormat(format, {
-      quality,
-      progressive:   true,
-      optimizeScans: true,
-    })
+    .toFormat(format, { quality })
     .toBuffer({ resolveWithObject: true })
     .then(({ data, info }) => ({
       err: null,
